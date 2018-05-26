@@ -2,6 +2,9 @@
 * This repository is reproduce the [R-NET: MACHINE READING  COMPREHENSION WITH SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf) in Pytorch.
 * This repository is designed for the [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) dataset.
 
+* This is my first repository,Any question can opening issues or email[s2w81234@gmail.com] me.
+
+
 ## Requirements
 
 Please check your perform and software version.
@@ -48,6 +51,3 @@ python3 evaluate-v1.1.py ./SQUAD/dev-v1.1.json ./prediction_answer.json
 	* Use Spacy tokenize.
 ## To do list
 	* Char-embedding input.
-
-This is my first repository!
-Any question can opening issues or email me.
