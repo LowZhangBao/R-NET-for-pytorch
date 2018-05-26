@@ -1,9 +1,11 @@
-# R-NET in pytorch
-	* This repository is reproduce the [R-NET: MACHINE READING  COMPREHENSION WITH SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf) in Pytorch.
-	* This repository is designed for the [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) dataset.
+# R-NET in Pytorch
+* This repository is reproduce the [R-NET: MACHINE READING  COMPREHENSION WITH SELF-MATCHING NETWORKS](https://www.microsoft.com/en-us/research/wp-content/uploads/2017/05/r-net.pdf) in Pytorch.
+* This repository is designed for the [SQuAD](https://rajpurkar.github.io/SQuAD-explorer/) dataset.
 
 ## Requirements
+
 Please check your perform and software version.
+
 #### General
 	* Python >= 3.5.2
 #### Python Packages
