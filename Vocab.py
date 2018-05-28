@@ -39,10 +39,10 @@ class Vocab_SQUAD:
     def get_word(self,index):
         if index in self.i_to_w:
             return self.i_to_w[index]
-        if word_id != self.UNK_ID and word_id != self.PAD_ID:
+        if index != self.UNK_ID and index != self.PAD_ID:
             print('Input Word is not define in this Vocab class')
             return None
-        if word_id == self.UNK_ID:
+        if index == self.UNK_ID:
             return "<UNIQUE_WORD>"
-        if word_id == self.PAD_ID:
+        if index == self.PAD_ID:
             return "<PADDING>"
