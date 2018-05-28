@@ -67,7 +67,7 @@ if __name__ == '__main__':
                                               dev_P_mask,
                                               dev_Q_mask,
                                               embedding,
-                                              dev_Q_ids),
+                                              dev_Q_id),
                               batch_size=10,
                               shuffle=True,
                               num_workers=0,
@@ -107,7 +107,7 @@ if __name__ == '__main__':
                     sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index-j])
                 else:
                     sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index+j])
-            prediction_dict[dev_Q_ids_to_squad[Q_ids[i]]] = sentense
+            prediction_dict[dev_id_to_qid[Q_ids[i]]] = sentense
 
     print('valid_f1: %f | valid_exact: %f'%(
           valid_f1/len(valid_engine), valid_exact/len(valid_engine)))
