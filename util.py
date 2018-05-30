@@ -49,7 +49,7 @@ def load_glove_vocab(file_dir,embedding):
         index+=1
 
         if index%10000 == 0 :
-            print("Processed %d of %d (%f percent done)" % (index, 87599, 100 * float(index) / float(87599)))
+            print("Processed %d of %d (%f percent done)" % (index, 2196027, 100 * float(index) / float(2196027)))
     
     f.close()
     return vocab,embedding
