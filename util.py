@@ -88,6 +88,26 @@ def create_char_index(char_list,char_vocab):
                 except:
                     char_array[i,j,k] = char_vocab["--OOV--"]
     return char_array
+def create_char_vocab(char_list,char_w2i,char_i2w):
+    _num=len(char_list)
+    _word_num= max([len(char_list[i]) for i in range(len(char_list))])
+    _char_num=max([max([len(char) for char in char_list[i]]) for i in range(len(char_list))])
+    print(_num,_word_num,_char_num)
+    char_array = np.ones((_num,_word_num,_char_num),dtype=np.uint16)
+    for i in range(_num):
+        now_sentense = char_list[i]
+        for j in range(len(now_sentense)):
+            now_word = now_sentense[j]
+            for k in range(len(now_word)):
+                #print(now_word)
+                now_char=now_word[k]
+                if now_char not in char_w2i:
+                    #print(i,j,k,now_char)
+                    char_w2i[now_char]=len(char_w2i)
+                    char_i2w[len(char_w2i)-1]=now_char
+                    
+                char_array[i,j,k] = char_w2i[now_char]
+    return char_array,char_w2i,char_i2w
 def remove_blank(input_str):
     input_str = input_str.lstrip()
     input_str = input_str.rstrip()

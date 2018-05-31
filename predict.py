@@ -19,8 +19,7 @@ use_cuda = torch.cuda.is_available()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', type=str, default='model.cpt', help='the model dir')
-parser.add_argument('--batch_size',type=int,default=32,help='dev batch size')
-parser.add_argument('--output_name',type=str,default='prediction_answer.json',help='the output name')
+parser.add_argument('--output_name',type=str,default='prediction_anser.json',help='the output name')
 args = parser.parse_args()
 
 
@@ -69,7 +68,7 @@ if __name__ == '__main__':
                                               dev_Q_mask,
                                               embedding,
                                               dev_Q_id),
-                              batch_size=args.batch_size,
+                              batch_size=10,
                               shuffle=True,
                               num_workers=0,
                               pin_memory=use_cuda)
@@ -107,11 +106,9 @@ if __name__ == '__main__':
                 if s_index>=e_index:
                     sentense +=  SQUAD_Vocab.get_word(dev_P[int(Q_ids[i]),s_index-j])
                 else:
-                    sentense +=  SQUAD_Vocab.get_word(dev_P[int(Q_ids[i]),s_index+j])
-            
-            prediction_dict[dev_id_to_qid[int(Q_ids[i])]] = sentense
-        print(sentense)
-        print('stack_valid_f1: %f | stack_valid_exact: %f'%(valid_f1, valid_exact))
+                    sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index+j])
+            prediction_dict[dev_id_to_qid[Q_ids[i]]] = sentense
+
     print('valid_f1: %f | valid_exact: %f'%(
           valid_f1/len(valid_engine), valid_exact/len(valid_engine)))
 

@@ -11,7 +11,7 @@ import numpy as np
 from Vocab import Vocab_SQUAD
 from Vocab import Vocab_char_SQUAD
 from util import load_squad,load_glove_vocab,get_line_count,load_glove_char_vocab
-from util import create_floder,download_dataset,create_char_index
+from util import create_floder,download_dataset,create_char_index,create_char_vocab
 from util import get_spacy_list
 from util import remove_blank
 
@@ -33,7 +33,7 @@ except:
   nlp=spacy.load('en_core_web_sm')
 ner_list,pos_list,pos_tag_list = get_spacy_list()
 
-print('preprocess SQUAD data!')
+print('preprocess SQUAD data - train data!')
 
 list_context       = []
 list_context_char  = []
@@ -125,7 +125,7 @@ for i in range(len(train['questions'])):
         print("Processed %d of %d (%f percent done)" % (i, len(train['questions']), 100 * float(i) / float(len(train['questions']))))
 
 print('')
-
+print('preprocess SQUAD data - dev data!')
 dev_list_context      = []
 dev_list_context_char = []
 dev_list_context_pos  = []
@@ -217,6 +217,7 @@ for i in range(len(dev['questions'])):
     if i%1000 == 0 :
         print("Processed %d of %d (%f percent done)" % (i, len(dev['questions']), 100 * float(i) / float(len(dev['questions']))))
 
+print('preprocess SQUAD data - char phase!')
 
 glove_char_length  = get_line_count(glove_char_dir)
 glove_char_embedding = np.zeros((glove_char_length+2, 300), dtype=np.float32)
@@ -228,6 +229,23 @@ temp_index=0
 for word in char_vocab:
     char_vocab_i_to_c[temp_index]=word
     temp_index+=1
+
+
+char_w2i={}
+char_i2w={}
+train_P_char,char_w2i,char_i2w=create_char_vocab(list_context_char,char_w2i,char_i2w)
+train_Q_char,char_w2i,char_i2w=create_char_vocab(list_question_char,char_w2i,char_i2w)
+dev_P_char,char_w2i,char_i2w=create_char_vocab(dev_list_context_char,char_w2i,char_i2w)
+dev_Q_char,char_w2i,char_i2w=create_char_vocab(dev_list_question_char,char_w2i,char_i2w)
+
+char_Vocab = Vocab_char_SQUAD(char_w2i,char_i2w)
+char_Vocab.save()
+
+np.save('./train_P_char_with_all_vocab.npy',train_P_char)
+np.save('./train_Q_char_with_all_vocab.npy',train_Q_char)
+np.save('./dev_P_char_with_all_vocab.npy',dev_P_char)
+np.save('./dev_Q_char_with_all_vocab.npy',dev_Q_char)
+
 
 
 train_P_char = create_char_index(list_context_char,char_vocab)
@@ -250,47 +268,61 @@ print('train_question_max_len',np.max([len(list_question[i]) for i in range(len(
 
 w2i={}
 i2w={}
-
+print('create SQUAD vocab w2i and i2w')
 k=0
-for i in range(len(list_context)):
-    for j in range(len(list_context[i])):
-        now_word=list_context[i][j]
-        if now_word  not in w2i.keys():
-            #print('yes')
-            w2i[list_context[i][j]]=k
-            i2w[k]=list_context[i][j]
-            k+=1
-for i in range(len(list_question)):
-    for j in range(len(list_question[i])):
-        now_word=list_question[i][j]
-        if now_word  not in w2i.keys():
-            #print('yes')
-            w2i[list_question[i][j]]=k
-            i2w[k]=list_question[i][j]
-            k+=1   
-for i in range(len(dev_list_context)):
-    for j in range(len(dev_list_context[i])):
-        now_word=dev_list_context[i][j]
-        if now_word  not in w2i.keys():
-            #print('yes')
-            w2i[dev_list_context[i][j]]=k
-            i2w[k]=dev_list_context[i][j]
-            k+=1
-for i in range(len(dev_list_question)):
-    for j in range(len(dev_list_question[i])):
-        now_word=dev_list_question[i][j]
-        if now_word  not in w2i.keys():
-            #print('yes')
-            w2i[dev_list_question[i][j]]=k
-            i2w[k]=dev_list_question[i][j]
-            k+=1   
-            
 
+for i in range(len(list_context)):
+    now_context=list_context[i]
+    for j in range(len(now_context)):
+        now_word=now_context[j]
+        if now_word  not in w2i.keys():
+            #print('yes')
+            w2i[now_word]=k
+            i2w[k]=now_word
+            k+=1
+print("Done 25%")
+for i in range(len(list_question)):
+    now_question=list_question[i]
+    for j in range(len(now_question)):
+        now_word=now_question[j]
+        if now_word  not in w2i.keys():
+            #print('yes')
+            w2i[now_word]=k
+            i2w[k]=now_word
+            k+=1   
+print("Done 50%")
+for i in range(len(dev_list_context)):
+    now_context=dev_list_context[i]
+    for j in range(len(now_context)):
+        now_word=now_context[j]
+        if now_word  not in w2i.keys():
+            #print('yes')
+            w2i[now_word]=k
+            i2w[k]=now_word
+            k+=1
+print("Done 75%")
+for i in range(len(dev_list_question)):
+    now_question=dev_list_question[i]
+    for j in range(len(now_question)):
+        now_word=now_question[j]
+        if now_word  not in w2i.keys():
+            #print('yes')
+            w2i[now_word]=k
+            i2w[k]=now_word
+            k+=1   
+print("Done 100%")
+print('glove_vocab_w2i_len:',len(w2i))
+print('glove_vocab_i2w_len:',len(i2w))
+
+print('glove_vocab_char_w2i_len:',len(char_vocab))
+print('glove_vocab_char_i2w_len:',len(char_vocab_i_to_c))
 
 Vocab = Vocab_SQUAD(w2i,i2w)
 Vocab.save()
-char_Vocab = Vocab_char_SQUAD(char_vocab,char_vocab_i_to_c)
-char_Vocab.save()
+
+#char_Vocab = Vocab_char_SQUAD(char_vocab,char_vocab_i_to_c)
+#char_Vocab.save()
+
 
 train_max_num   = len(list_context)
 train_max_p_num = max([len(list_context[i])      for i in range(len(list_context     ))])
@@ -299,7 +331,7 @@ dev_max_num     = len(dev_list_context)
 dev_max_p_num   = max([len(dev_list_context[i])  for i in range(len(dev_list_context ))])
 dev_max_q_num   = max([len(dev_list_question[i]) for i in range(len(dev_list_question))])
 
-
+print('create training data array')
 train_P     = np.zeros((train_max_num,train_max_p_num),dtype=np.uint32 )
 train_P_pos = np.zeros((train_max_num,train_max_p_num),dtype=np.uint8 )
 train_P_tag = np.zeros((train_max_num,train_max_p_num),dtype=np.uint8 )
@@ -319,13 +351,14 @@ dev_Q_tag   = np.zeros((dev_max_num  ,dev_max_q_num  ),dtype=np.uint8 )
 dev_Q_ner   = np.zeros((dev_max_num  ,dev_max_q_num  ),dtype=np.uint8 )
 dev_A       = np.zeros((dev_max_num  ,2              ),dtype=np.float32)
 
+print('load data to training data _ train phase')
 for i in range(train_max_num):
     temp_p = list_context[i]
     temp_p = [w2i[word] for word in temp_p]
     temp_p = np.array(Vocab.create_padded_list(temp_p,train_max_p_num),dtype=np.uint32)
-    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(list_context_pos[i],train_max_p_num,pos_list['']       ),dtype=np.uint32)
-    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(list_context_tag[i],train_max_p_num,pos_tag_list['NIL']),dtype=np.uint32) 
-    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(list_context_ner[i],train_max_p_num,ner_list['']       ),dtype=np.uint32)
+    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(list_context_pos[i],train_max_p_num,pos_list['']       ),dtype=np.uint8)
+    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(list_context_tag[i],train_max_p_num,pos_tag_list['NIL']),dtype=np.uint8) 
+    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(list_context_ner[i],train_max_p_num,ner_list['']       ),dtype=np.uint8)
     train_P[i,:] = temp_p
     train_P_pos[i,:] = temp_pos
     train_P_tag[i,:] = temp_tag
@@ -333,21 +366,22 @@ for i in range(train_max_num):
     temp_q = list_question[i]
     temp_q = [w2i[word] for word in temp_q]
     temp_q = np.array(Vocab.create_padded_list(temp_q,train_max_q_num),dtype=np.uint32)
-    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(list_question_pos[i],train_max_q_num,pos_list['']       ),dtype=np.uint32)
-    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(list_question_tag[i],train_max_q_num,pos_tag_list['NIL']),dtype=np.uint32) 
-    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(list_question_ner[i],train_max_q_num,ner_list['']       ),dtype=np.uint32)
+    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(list_question_pos[i],train_max_q_num,pos_list['']       ),dtype=np.uint8)
+    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(list_question_tag[i],train_max_q_num,pos_tag_list['NIL']),dtype=np.uint8) 
+    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(list_question_ner[i],train_max_q_num,ner_list['']       ),dtype=np.uint8)
     train_Q[i,:] = temp_q
     train_Q_pos[i,:] = temp_pos
     train_Q_tag[i,:] = temp_tag
     train_Q_ner[i,:] = temp_ner
     train_A[i,:] = spans[i]
+print('load data to training data _ dev phase')
 for i in range(dev_max_num):
     temp_p = dev_list_context[i]
     temp_p = [w2i[word] for word in temp_p]
     temp_p = np.array(Vocab.create_padded_list(temp_p,dev_max_p_num),dtype=np.uint32)
-    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(dev_list_context_pos[i],dev_max_p_num,pos_list['']       ),dtype=np.uint32)
-    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(dev_list_context_tag[i],dev_max_p_num,pos_tag_list['NIL']),dtype=np.uint32) 
-    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(dev_list_context_ner[i],dev_max_p_num,ner_list['']       ),dtype=np.uint32)
+    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(dev_list_context_pos[i],dev_max_p_num,pos_list['']       ),dtype=np.uint8)
+    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(dev_list_context_tag[i],dev_max_p_num,pos_tag_list['NIL']),dtype=np.uint8) 
+    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(dev_list_context_ner[i],dev_max_p_num,ner_list['']       ),dtype=np.uint8)
     dev_P[i,:] = temp_p
     dev_P_pos[i,:] = temp_pos
     dev_P_tag[i,:] = temp_tag
@@ -355,14 +389,15 @@ for i in range(dev_max_num):
     temp_q = dev_list_question[i]
     temp_q = [w2i[word] for word in temp_q]
     temp_q = np.array(Vocab.create_padded_list(temp_q,dev_max_q_num),dtype=np.uint32)
-    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(dev_list_question_pos[i],dev_max_q_num,pos_list['']       ),dtype=np.uint32)
-    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(dev_list_question_tag[i],dev_max_q_num,pos_tag_list['NIL']),dtype=np.uint32) 
-    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(dev_list_question_ner[i],dev_max_q_num,ner_list['']       ),dtype=np.uint32)
+    temp_pos = np.array(Vocab.create_padded_list_with_pad_value(dev_list_question_pos[i],dev_max_q_num,pos_list['']       ),dtype=np.uint8)
+    temp_tag = np.array(Vocab.create_padded_list_with_pad_value(dev_list_question_tag[i],dev_max_q_num,pos_tag_list['NIL']),dtype=np.uint8) 
+    temp_ner = np.array(Vocab.create_padded_list_with_pad_value(dev_list_question_ner[i],dev_max_q_num,ner_list['']       ),dtype=np.uint8)
     dev_Q[i,:] = temp_q
     dev_Q_pos[i,:] = temp_pos
     dev_Q_tag[i,:] = temp_tag
     dev_Q_ner[i,:] = temp_ner
     dev_A[i,:] = dev_spans[i]
+print('save_training data')
 
 np.save('./SQUAD/train/train_P.npy'    ,train_P)
 np.save('./SQUAD/train/train_P_pos.npy',train_P_pos)
