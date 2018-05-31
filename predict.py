@@ -104,7 +104,7 @@ if __name__ == '__main__':
                 if j!=0:
                     sentense+=" "
                 if s_index>=e_index:
-                    sentense +=  SQUAD_Vocab.get_word(dev_P[int(Q_ids[i]),s_index-j])
+                    sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index-j])
                 else:
                     sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index+j])
             prediction_dict[dev_id_to_qid[Q_ids[i]]] = sentense
