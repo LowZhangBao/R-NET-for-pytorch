@@ -19,6 +19,7 @@ parser = argparse.ArgumentParser(description='Model and Training parameters')
 # Model Architecture
 parser.add_argument('--hidden_size', type=int, default=75, help='the hidden size of RNNs [75]')
 # Training hyperparameter
+parser.add_argument('--dev_phase',type=int,default=1,help='every epoch calculate dev score?')
 parser.add_argument('--dropout', type=float, default=0.2)
 parser.add_argument('--batch_size', type=int, default=32, help='the size of batch [32]')
 parser.add_argument('--lr', type=float, default=1, help='the learning rate of encoder [1]')
@@ -154,31 +155,31 @@ if __name__ == '__main__':
                     torch.save(R_net, 'module'+'_now_epoch_'+str(epoch)+'now_batch_'+str(batch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(f1_score)+'_em_'+str(exact_match_score)+'.cpt')
 
             batch +=1
-        
-        valid_f1, valid_exact = 0, 0
-        R_net.eval()
-        for p, q, ans_offset,p_mask,q_mask,idx in valid_engine:
-            p = Variable(p).cuda() if use_cuda else Variable(p)
-            q = Variable(q).cuda() if use_cuda else Variable(q)
-            p_mask = Variable(p_mask).cuda() if use_cuda else Variable(p_mask)
-            q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask) 
-            start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
-            end_ans = Variable(ans_offset[:,1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
-            
-            start,_, end,_ = R_net(p,q,p_mask,q_mask)
-            
-            start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
-            
-            f1_score, exact_match_score = batch_score(start, end, ans_offset)
-            valid_f1 += f1_score
-            valid_exact += exact_match_score
-        print('epoch: %d | valid_f1: %f | valid_exact: %f'%(
-                  epoch, valid_f1/len(valid_engine), valid_exact/len(valid_engine)
-            ))
-        if epoch % args.save_freq == 0:
-            vad_f1 = valid_f1/len(valid_engine)
-            vad_em = valid_exact/len(valid_engine)
-            torch.save(R_net, 'module9'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
+        if args.dev_phase==True:
+          valid_f1, valid_exact = 0, 0
+          R_net.eval()
+          for p, q, ans_offset,p_mask,q_mask,idx in valid_engine:
+              p = Variable(p).cuda() if use_cuda else Variable(p)
+              q = Variable(q).cuda() if use_cuda else Variable(q)
+              p_mask = Variable(p_mask).cuda() if use_cuda else Variable(p_mask)
+              q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask) 
+              start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
+              end_ans = Variable(ans_offset[:,1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
+              
+              start,_, end,_ = R_net(p,q,p_mask,q_mask)
+              
+              start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
+              
+              f1_score, exact_match_score = batch_score(start, end, ans_offset)
+              valid_f1 += f1_score
+              valid_exact += exact_match_score
+          print('epoch: %d | valid_f1: %f | valid_exact: %f'%(
+                    epoch, valid_f1/len(valid_engine), valid_exact/len(valid_engine)
+              ))
+          if epoch % args.save_freq == 0:
+              vad_f1 = valid_f1/len(valid_engine)
+              vad_em = valid_exact/len(valid_engine)
+              torch.save(R_net, 'module9'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
     torch.save(R_net, 'module_final'+'_concat_'+str(args.encoder_concat)+'_f1_'+str(valid_f1)+'_em_'+str(valid_exact)+'.cpt')
     
 
