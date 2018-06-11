@@ -175,30 +175,34 @@ if __name__ == '__main__':
 
             batch +=1
         if args.dev_phase==True:
-          valid_f1, valid_exact = 0, 0
-          R_net.eval()
-          for p, q, ans_offset,p_mask,q_mask,idx in valid_engine:
-              p = Variable(p).cuda() if use_cuda else Variable(p)
-              q = Variable(q).cuda() if use_cuda else Variable(q)
-              p_mask = Variable(p_mask).cuda() if use_cuda else Variable(p_mask)
-              q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask) 
-              start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
-              end_ans = Variable(ans_offset[:,1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
-              
-              start,_, end,_ = R_net(p,q,p_mask,q_mask)
-              
-              start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
-              
-              f1_score, exact_match_score = batch_score(start, end, ans_offset)
-              valid_f1 += f1_score
-              valid_exact += exact_match_score
-          print('epoch: %d | valid_f1: %f | valid_exact: %f'%(
-                    epoch, valid_f1/len(valid_engine), valid_exact/len(valid_engine)
-              ))
-          if epoch % args.save_freq == 0:
-              vad_f1 = valid_f1/len(valid_engine)
-              vad_em = valid_exact/len(valid_engine)
-              torch.save(R_net, 'module'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
+            valid_f1, valid_exact = 0, 0
+            R_net.eval()
+            for p, q, ans_offset,p_mask,q_mask,pc,qc,pc_mask,qc_mask,idx in valid_engine:
+                p = Variable(p).cuda() if use_cuda else Variable(p)
+                q = Variable(q).cuda() if use_cuda else Variable(q)
+                pc = Variable(pc).cuda() if use_cuda else Variabel(pc)
+                qc = Variable(qc).cuda() if use_cuda else Variabel(qc)
+                p_mask = Variable(p_mask).cuda() if use_cuda else Variable(p_mask)
+                q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask)
+                pc_mask = Variable(pc_mask).cuda() if use_cuda else Variable(pc_mask)
+                qc_mask = Variable(qc_mask).cuda() if use_cuda else Variable(qc_mask)
+                start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
+                end_ans = Variable(ans_offset[:, 1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
+                
+                start,_, end,_ = R_net(p,q,p_mask,q_mask,pc,qc,pc_mask,qc_mask)
+                
+                start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
+                
+                f1_score, exact_match_score = batch_score(start, end, ans_offset)
+                valid_f1 += f1_score
+                valid_exact += exact_match_score
+                print('epoch: %d | valid_f1: %f | valid_exact: %f'%(
+                      epoch, valid_f1/len(valid_engine), valid_exact/len(valid_engine)
+                ))
+                if epoch % args.save_freq == 0:
+                    vad_f1 = valid_f1/len(valid_engine)
+                    vad_em = valid_exact/len(valid_engine)
+                    torch.save(R_net, 'module'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
     torch.save(R_net, 'module_final'+'_concat_'+str(args.encoder_concat)+'_f1_'+str(valid_f1)+'_em_'+str(valid_exact)+'.cpt')
     
 

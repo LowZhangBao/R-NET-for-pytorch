@@ -9,12 +9,15 @@ import numpy as np
 import json
 import torch
 import torch.nn as nn
+import setting
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from torch import optim
-from Vocab import Vocab_SQUAD
+from Vocab import Vocab_class   
+from util import load_squad_data,create_mask
 from module import R_Net,decode
 from metrics import batch_score
+
 use_cuda = torch.cuda.is_available()
 bug_flag=True
 
@@ -25,33 +28,32 @@ args = parser.parse_args()
 
 
 if __name__ == '__main__':
-    dev_P_dir = r"./SQUAD/dev/dev_P.npy"
-    dev_Q_dir = r"./SQUAD/dev/dev_Q.npy"
-    dev_A_dir = r"./SQUAD/dev/dev_A.npy"
+
+    train_P,train_Q,train_P_c,train_Q_c,train_A,dev_P,dev_Q,dev_P_c,dev_Q_c,dev_A = load_squad_data()
+    
     dev_Q_id_dir = r"./SQUAD/dev/dev_Q_id.npy"
     dev_Q_id_to_qid_dir=r"./SQUAD/dev/dev_id_to_qid.pkl"
 
-    Embedding_output_dir=r"./SQUAD/squad_word_embedding.npy"
-
-    dev_P = np.load(dev_P_dir)
-    dev_Q = np.load(dev_Q_dir)
-    dev_A = np.load(dev_A_dir)
     dev_Q_id = np.load(dev_Q_id_dir)
+    word_Vocab = Vocab_class()
+    word_Vocab.load(setting.word_vocab_w2i_dir,setting.word_vocab_i2w_dir)
+    char_Vocab  = Vocab_class()
+    if setting.use_all_char_vocab is True:
+        char_Vocab.load(setting.char_all_vocab_w2i_dir   ,setting.char_all_vocab_i2w_dir)
+    else:
+        char_Vocab.load(setting.char_simple_vocab_w2i_dir,setting.char_simple_vocab_i2w_dir)
 
-    dev_P_mask=np.zeros(dev_P.shape,dtype=np.uint8)
-    dev_Q_mask=np.zeros(dev_Q.shape,dtype=np.uint8)
+
+    word_PAD_ID = word_Vocab.PAD_ID
+    word_UNK_ID = word_Vocab.UNK_ID
+    char_PAD_ID = char_Vocab.PAD_ID
+    char_UNK_ID = char_Vocab.UNK_ID
+    dev_P_mask   = create_mask(dev_P,word_PAD_ID,word_UNK_ID)
+    dev_Q_mask   = create_mask(dev_Q,word_PAD_ID,word_UNK_ID)
 
 
-    SQUAD_Vocab = Vocab_SQUAD()
-    SQUAD_Vocab.load()
-    PAD_ID = SQUAD_Vocab.PAD_ID
-    UNK_ID = SQUAD_Vocab.UNK_ID
-
-    dev_P_mask[dev_P==PAD_ID] = 1
-    dev_P_mask[dev_P==UNK_ID] = 0
-    dev_Q_mask[dev_Q==PAD_ID] = 1
-    dev_Q_mask[dev_Q==UNK_ID] = 0   
-
+    dev_P_char_mask   = create_mask(dev_P_c,char_PAD_ID,char_UNK_ID)
+    dev_Q_char_mask   = create_mask(dev_Q_c,char_PAD_ID,char_UNK_ID)
 
     with open(dev_Q_id_to_qid_dir,'rb') as f:
         dev_id_to_qid = pickle.load(f)
@@ -62,13 +64,18 @@ if __name__ == '__main__':
 
     print('Vocab size: %d | Max context: %d | Max question: %d'%(
           embedding.shape[0], dev_P.shape[1], dev_Q.shape[1]))
-    valid_engine = DataLoader(data.DataEngine_for_prediction(dev_P,
-                                              dev_Q,
-                                              dev_A,
-                                              dev_P_mask,
-                                              dev_Q_mask,
-                                              embedding,
-                                              dev_Q_id),
+    valid_engine = DataLoader(data.DataEngine_for_prediction( dev_P,
+                                                              dev_Q,
+                                                              dev_A,
+                                                              dev_P_mask,
+                                                              dev_Q_mask,
+                                                              word_embedding,
+                                                              dev_Q_id, 
+                                                              dev_P_c,
+                                                              dev_Q_c,
+                                                              dev_P_char_mask,
+                                                              dev_Q_char_mask,
+                                                              char_embedding),
                               batch_size=10,
                               shuffle=True,
                               num_workers=0,
@@ -82,14 +89,19 @@ if __name__ == '__main__':
     R_net.eval()
     valid_f1, valid_exact = 0, 0
     prediction_dict={}
-    for p, q, ans_offset,p_mask,q_mask,Q_ids,idx in valid_engine:
+    for p, q, ans_offset,p_mask,q_mask,pc,qc,pc_mask,qc_mask,Q_ids,idx in valid_engine:
         p = Variable(p).cuda() if use_cuda else Variable(p)
         q = Variable(q).cuda() if use_cuda else Variable(q)
+        pc = Variable(pc).cuda() if use_cuda else Variabel(pc)
+        qc = Variable(qc).cuda() if use_cuda else Variabel(qc)
         p_mask = Variable(p_mask).cuda() if use_cuda else Variable(p_mask)
-        q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask) 
+        q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask)
+        pc_mask = Variable(pc_mask).cuda() if use_cuda else Variable(pc_mask)
+        qc_mask = Variable(qc_mask).cuda() if use_cuda else Variable(qc_mask)
         start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
-        end_ans = Variable(ans_offset[:,1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
-        start,_,end,_ = R_net(p,q,p_mask,q_mask)
+        end_ans = Variable(ans_offset[:, 1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
+        
+        start,_,end,_ = R_net(p,q,p_mask,q_mask,pc,qc,pc_mask,qc_mask)
         
         start, end, scores = decode(start.data.cpu(), end.data.cpu(), 1)
         f1_score, exact_match_score = batch_score(start, end, ans_offset)
@@ -105,9 +117,9 @@ if __name__ == '__main__':
                 if j!=0:
                     sentense+=" "
                 if s_index>=e_index:
-                    sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index-j])
+                    sentense +=  word_Vocab.get_word(dev_P[i,s_index-j])
                 else:
-                    sentense +=  SQUAD_Vocab.get_word(dev_P[i,s_index+j])
+                    sentense +=  word_Vocab.get_word(dev_P[i,s_index+j])
             prediction_dict[dev_id_to_qid[Q_ids[i]]] = sentense
 
     print('valid_f1: %f | valid_exact: %f'%(
