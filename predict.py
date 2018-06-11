@@ -16,6 +16,7 @@ from Vocab import Vocab_SQUAD
 from module import R_Net,decode
 from metrics import batch_score
 use_cuda = torch.cuda.is_available()
+bug_flag=True
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', type=str, default='model.cpt', help='the model dir')
