@@ -1,5 +1,5 @@
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="1"
+os.environ["CUDA_VISIBLE_DEVICES"]="0"
 import argparse
 import data
 import random
@@ -10,9 +10,11 @@ import torch.nn as nn
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from torch import optim
-from Vocab import Vocab_SQUAD 
+from Vocab import Vocab_class   
+from util import load_squad_data,create_mask
 from module import R_Net,decode
 from metrics import batch_score
+import setting
 use_cuda = torch.cuda.is_available()
 
 parser = argparse.ArgumentParser(description='Model and Training parameters')
@@ -20,6 +22,7 @@ parser = argparse.ArgumentParser(description='Model and Training parameters')
 parser.add_argument('--hidden_size', type=int, default=75, help='the hidden size of RNNs [75]')
 # Training hyperparameter
 parser.add_argument('--dev_phase',type=int,default=1,help='every epoch calculate dev score?')
+
 parser.add_argument('--dropout', type=float, default=0.2)
 parser.add_argument('--batch_size', type=int, default=32, help='the size of batch [32]')
 parser.add_argument('--lr', type=float, default=1, help='the learning rate of encoder [1]')
@@ -30,6 +33,7 @@ parser.add_argument('--epoch', type=int, default=35, help='train for N epochs [2
 parser.add_argument('--encoder_concat',type=int,default=1,help='use encoder concat')
 parser.add_argument('--seed',type=int,default=1023,help='random_seed')
 parser.add_argument('--ii_iter',type=int,default=1,help='repeat training batch n iter ')
+parser.add_argument('--char_input',type=int,default=1,help='use char encoder input?')
 args = parser.parse_args()
 
 if __name__ == '__main__':
@@ -39,49 +43,46 @@ if __name__ == '__main__':
     if use_cuda:
         torch.cuda.manual_seed_all(args.seed)
 
-    train_P_dir = r"./SQUAD/train/train_P.npy"
-    train_Q_dir = r"./SQUAD/train/train_Q.npy"
-    train_A_dir = r"./SQUAD/train/train_A.npy"
+    train_P,train_Q,train_P_c,train_Q_c,train_A,dev_P,dev_Q,dev_P_c,dev_Q_c,dev_A = load_squad_data()
+    
+    word_Vocab = Vocab_class()
+    word_Vocab.load(setting.word_vocab_w2i_dir,setting.word_vocab_i2w_dir)
+    char_Vocab  = Vocab_class()
+    if setting.use_all_char_vocab is True:
+        char_Vocab.load(setting.char_all_vocab_w2i_dir   ,setting.char_all_vocab_i2w_dir)
+    else:
+        char_Vocab.load(setting.char_simple_vocab_w2i_dir,setting.char_simple_vocab_i2w_dir)
 
-    dev_P_dir = r"./SQUAD/dev/dev_P.npy"
-    dev_Q_dir = r"./SQUAD/dev/dev_Q.npy"
-    dev_A_dir = r"./SQUAD/dev/dev_A.npy"
-    Embedding_output_dir=r"./SQUAD/squad_word_embedding.npy"
-
-    train_P = np.load(train_P_dir)
-    train_Q = np.load(train_Q_dir)
-    train_A = np.load(train_A_dir).astype(np.float32)
-    dev_P = np.load(dev_P_dir)
-    dev_Q = np.load(dev_Q_dir)
-    dev_A = np.load(dev_A_dir).astype(np.float32)
-    train_P_mask=np.zeros(train_P.shape,dtype=np.uint8) 
-    train_Q_mask=np.zeros(train_Q.shape,dtype=np.uint8)
-    dev_P_mask=np.zeros(dev_P.shape,dtype=np.uint8)
-    dev_Q_mask=np.zeros(dev_Q.shape,dtype=np.uint8)
-
-    SQUAD_Vocab = Vocab_SQUAD()
-    SQUAD_Vocab.load()
-    PAD_ID = SQUAD_Vocab.PAD_ID
-    UNK_ID = SQUAD_Vocab.UNK_ID
+    word_PAD_ID = word_Vocab.PAD_ID
+    word_UNK_ID = word_Vocab.UNK_ID
+    char_PAD_ID = char_Vocab.PAD_ID
+    char_UNK_ID = char_Vocab.UNK_ID
+  
+    train_P_mask = create_mask(train_P,word_PAD_ID,word_UNK_ID)
+    train_Q_mask = create_mask(train_Q,word_PAD_ID,word_UNK_ID)
+    dev_P_mask   = create_mask(dev_P,word_PAD_ID,word_UNK_ID)
+    dev_Q_mask   = create_mask(dev_Q,word_PAD_ID,word_UNK_ID)
 
 
-    train_P_mask[train_P==PAD_ID] = 1
-    train_P_mask[train_P==UNK_ID] = 0 
-    train_Q_mask[train_Q==PAD_ID] = 1
-    train_Q_mask[train_Q==UNK_ID] = 0
-    dev_P_mask[dev_P==PAD_ID] = 1
-    dev_P_mask[dev_P==UNK_ID] = 0
-    dev_Q_mask[dev_Q==PAD_ID] = 1
-    dev_Q_mask[dev_Q==UNK_ID] = 0    
-    embedding=np.load(Embedding_output_dir)
+    train_P_char_mask = create_mask(train_P_c,char_PAD_ID,char_UNK_ID)
+    train_Q_char_mask = create_mask(train_Q_c,char_PAD_ID,char_UNK_ID)
+    dev_P_char_mask   = create_mask(dev_P_c,char_PAD_ID,char_UNK_ID)
+    dev_Q_char_mask   = create_mask(dev_Q_c,char_PAD_ID,char_UNK_ID)
     
 
+    Word_Embedding_output_dir = r"./SQUAD/squad_word_embedding.npy"
+    Char_Embedding_output_dir = r"./SQUAD/squad_char_embedding.npy"
+    word_embedding=np.load(setting.SQUAD_Word_Embedding_output_dir)
+    if setting.use_all_char_vocab is True:
+        char_embedding=np.load(setting.SQUAD_Char_all_Embedding_output_dir)
+    else:
+        char_embedding=np.load(setting.SQUAD_Char_simple_Embedding_output_dir)
     
-    print('Vocab size: %d | Max context: %d | Max question: %d'%(
-          embedding.shape[0], train_P.shape[1], train_Q.shape[1]))
+    print('Word Vocab size: %d | Char Vocab size: %d | Max context: %d | Max question: %d'%(
+          word_embedding.shape[0],char_embedding.shape[0], train_P.shape[1], train_Q.shape[1]))
 
     print('Train: %d | Valid: %d | Test: %d'%(
-          train_Q.shape[0],0,dev_P.shape[0] ))
+          train_P.shape[0],0,dev_P.shape[0] ))
 
 
     train_engine = DataLoader(data.DataEngine(train_P,
@@ -89,7 +90,12 @@ if __name__ == '__main__':
                                               train_A,
                                               train_P_mask,
                                               train_Q_mask,
-                                              embedding),
+                                              word_embedding,
+                                              train_P_c,
+                                              train_Q_c,
+                                              train_P_char_mask,
+                                              train_Q_char_mask,
+                                              char_embedding),
                               batch_size=args.batch_size,
                               shuffle=True,
                               num_workers=0,
@@ -100,7 +106,12 @@ if __name__ == '__main__':
                                               dev_A,
                                               dev_P_mask,
                                               dev_Q_mask,
-                                              embedding),
+                                              word_embedding, 
+                                              dev_P_c,
+                                              dev_Q_c,
+                                              dev_P_char_mask,
+                                              dev_Q_char_mask,
+                                              char_embedding),
                               batch_size=args.batch_size,
                               shuffle=True,
                               num_workers=0,
@@ -108,11 +119,14 @@ if __name__ == '__main__':
 
 
     R_net = R_Net(batch_size=args.batch_size,
-                  embedding_size=300,
+                  char_embedding_size=setting.char_dim,
+                  embedding_size=setting.word_dim,
                   hidden_size=75,
                   dropout=args.dropout,
-                  encoder_concat=args.encoder_concat
+                  encoder_concat=args.encoder_concat,
+                  char_input=args.char_input
                   )
+
     if use_cuda:
         R_net = R_net.cuda()
         print('use_cuda!  ')
@@ -122,17 +136,22 @@ if __name__ == '__main__':
     for epoch in range(args.epoch):
         batch = 0
         R_net.train()
-        for p, q, ans_offset,p_mask,q_mask,idx in train_engine:
+        for p, q, ans_offset,p_mask,q_mask,pc,qc,pc_mask,qc_mask,idx in train_engine:
             p = Variable(p).cuda() if use_cuda else Variable(p)
             q = Variable(q).cuda() if use_cuda else Variable(q)
+            pc = Variable(pc).cuda() if use_cuda else Variabel(pc)
+            qc = Variable(qc).cuda() if use_cuda else Variabel(qc)
             p_mask = Variable(p_mask).cuda() if use_cuda else Variable(p_mask)
             q_mask = Variable(q_mask).cuda() if use_cuda else Variable(q_mask)
+            pc_mask = Variable(pc_mask).cuda() if use_cuda else Variable(pc_mask)
+            qc_mask = Variable(qc_mask).cuda() if use_cuda else Variable(qc_mask)
             start_ans = Variable(ans_offset[:, 0]).cuda() if use_cuda else Variable(ans_offset[:, 0])
             end_ans = Variable(ans_offset[:, 1]).cuda() if use_cuda else Variable(ans_offset[:, 1])
             for ii in range(args.ii_iter):
                 batch_start = datetime.datetime.now()                           
                 
-                start1, start1_ori, end2, end2_ori = R_net(p,q,p_mask,q_mask)
+                start1, start1_ori, end2, end2_ori = R_net(p,q,p_mask,q_mask,pc,qc,pc_mask,qc_mask)
+                
                 loss1 = criterion(start1_ori, start_ans) 
                 loss2 = criterion(end2_ori, end_ans)
                 loss = loss1+loss2
@@ -179,7 +198,7 @@ if __name__ == '__main__':
           if epoch % args.save_freq == 0:
               vad_f1 = valid_f1/len(valid_engine)
               vad_em = valid_exact/len(valid_engine)
-              torch.save(R_net, 'module9'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
+              torch.save(R_net, 'module'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
     torch.save(R_net, 'module_final'+'_concat_'+str(args.encoder_concat)+'_f1_'+str(valid_f1)+'_em_'+str(valid_exact)+'.cpt')
     
 

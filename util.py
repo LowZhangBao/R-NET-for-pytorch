@@ -6,7 +6,9 @@ import math
 import requests
 import zipfile
 import numpy as np
-def load_squad(file_name):
+import setting
+from Vocab import Vocab_class
+def load_squad_file(file_name):
     data = json.load(open(file_name, 'r'))['data']
     output = {'qids': [], 'questions': [], 'answers': [],
               'contexts': [], 'qid2cid': []}
@@ -19,95 +21,121 @@ def load_squad(file_name):
                 output['qid2cid'].append(len(output['contexts']) - 1)
                 output['answers'].append(qa['answers'])
     return output
+def load_squad_data():
+    train_P_dir      = setting.train_P_dir
+    train_Q_dir      = setting.train_Q_dir
+    train_P_char_dir = setting.train_P_char_all_dir if setting.use_all_char_vocab==True else setting.train_P_char_simple_dir 
+    train_Q_char_dir = setting.train_Q_char_all_dir if setting.use_all_char_vocab==True else setting.train_Q_char_simple_dir
+    train_A_dir      = setting.train_A_dir
 
-def get_line_count(data_dir):
-    temp_line=0
-    try:
-        f = open(data_dir,"r",encoding='utf-8')
-    except:
-        f = open(data_dir,"r")
-    for _ in f:
-        temp_line += 1
-    print("Vocab size: %d" % temp_line)
-    f.close()
-    return temp_line
+    dev_P_dir        = setting.dev_P_dir
+    dev_Q_dir        = setting.dev_Q_dir
+    dev_P_char_dir   = setting.dev_P_char_all_dir if setting.use_all_char_vocab==True else setting.dev_P_char_simple_dir
+    dev_Q_char_dir   = setting.dev_Q_char_all_dir if setting.use_all_char_vocab==True else setting.dev_Q_char_simple_dir
+    dev_A_dir        = setting.dev_A_dir
 
-def load_glove_vocab(file_dir,embedding):
+    train_P   = np.load(train_P_dir)
+    train_Q   = np.load(train_Q_dir)
+    train_P_c = np.load(train_P_char_dir)
+    train_Q_c = np.load(train_Q_char_dir)
+    train_A   = np.load(train_A_dir).astype(np.float32)
+    dev_P     = np.load(dev_P_dir)
+    dev_Q     = np.load(dev_Q_dir)
+    dev_P_c   = np.load(dev_P_char_dir)
+    dev_Q_c   = np.load(dev_Q_char_dir)
+    dev_A     = np.load(dev_A_dir).astype(np.float32)
+    
+
+    return train_P,train_Q,train_P_c,train_Q_c,train_A,dev_P,dev_Q,dev_P_c,dev_Q_c,dev_A
+def load_glove_file_embedding(file_dir,embedding,max_dim=300):
     vocab = {}
     index=0
     try:
         f = open(file_dir,"r",encoding='utf-8')
     except:
         f = open(file_dir,"r")
-
     for line in f:
         idx = line.index(" ")
         word = line[:idx]
         word_embedding = line[idx+1:]
         vocab[word]=index
-        embedding[index]=np.fromstring(word_embedding,dtype=np.float32,sep=' ')
+        embedding[index]=np.fromstring(word_embedding,dtype=np.float32,sep=' ')[:max_dim]
         index+=1
-
-        if index%10000 == 0 :
-            print("Processed %d of %d (%f percent done)" % (index, 2196027, 100 * float(index) / float(2196027)))
     
     f.close()
     return vocab,embedding
-def load_glove_char_vocab(file_dir,embedding):
+def load_glove_file_vocab(file_dir):
     vocab = {}
-    index=2
     try:
         f = open(file_dir,"r",encoding='utf-8')
     except:
         f = open(file_dir,"r")
+
     for line in f:
         idx = line.index(" ")
         word = line[:idx]
-        word_embedding = line[idx+1:]
-        vocab[word]=index
-        embedding[index]=np.fromstring(word_embedding,dtype=np.float32,sep=' ')
-        index+=1
+        vocab[word]=len(vocab) 
     f.close()
-    return vocab,embedding
+    return vocab
+def load_glove_to_squad_embedding(glove_vocab,squad_vocab,glove_embedding,squad_embedding):  
+    for i,now_word in enumerate(squad_vocab.w_to_i):
+        squad_index=squad_vocab.w_to_i[now_word]
+        if now_word in glove_vocab:
+            glove_index = glove_vocab[now_word]
+            squad_embedding[squad_index,:] = glove_embedding[glove_index,:]
+    return squad_embedding
 
-def create_char_index(char_list,char_vocab):
+def create_char_array(char_list,char_vocab,word_max=None,char_max=None):
     _num=len(char_list)
-    _word_num= max([len(char_list[i]) for i in range(len(char_list))])
-    _char_num=max([max([len(char) for char in char_list[i]]) for i in range(len(char_list))])
+
+    _word_num = max([len(char_list[i]) for i in range(len(char_list))]) 
+    _word_num = _word_num if word_max == None else min(_word_num,word_max) 
+    _char_num = max([max([len(char) for char in char_list[i]]) for i in range(len(char_list))])
+    _char_num = _char_num if char_max == None else min(_char_num,char_max)
     print(_num,_word_num,_char_num)
-    char_array = np.ones((_num,_word_num,_char_num),dtype=np.uint8)
+    char_array = np.ones((_num,_word_num,_char_num),dtype=np.uint16)*char_vocab["--PAD--"]
     for i in range(_num):
         now_sentense = char_list[i]
-        for j in range(len(now_sentense)):
+        s_len = min(len(now_sentense),_word_num)
+        for j in range(s_len):
             now_word = now_sentense[j]
-            for k in range(len(now_word)):
-                now_char=now_word[k]
-                #if now_char in char_vocab:
+            c_len = min(len(now_word),_char_num)
+            for k in range(c_len):
                 try:
                     char_array[i,j,k] = char_vocab[now_word[k]]
                 except:
                     char_array[i,j,k] = char_vocab["--OOV--"]
     return char_array
-def create_char_vocab(char_list,char_w2i,char_i2w):
+def create_char_vocab(char_list,char_w2i,char_i2w,word_max=None,char_max=None):
     _num=len(char_list)
     _word_num= max([len(char_list[i]) for i in range(len(char_list))])
+    _word_num = _word_num if word_max == None else min(_word_num,word_max) 
     _char_num=max([max([len(char) for char in char_list[i]]) for i in range(len(char_list))])
+    _char_num = _char_num if char_max == None else min(_char_num,char_max)
     print(_num,_word_num,_char_num)
-    char_array = np.ones((_num,_word_num,_char_num),dtype=np.uint16)
+    char_array = np.ones((_num,_word_num,_char_num),dtype=np.uint16)*int(char_w2i["--PAD--"])
     for i in range(_num):
         now_sentense = char_list[i]
-        for j in range(len(now_sentense)):
+        s_len = min(len(now_sentense),_word_num)
+        for j in range(s_len):
             now_word = now_sentense[j]
-            for k in range(len(now_word)):
-                #print(now_word)
+            c_len = min(len(now_word),_char_num)
+            for k in range(c_len):
                 now_char=now_word[k]
                 if now_char not in char_w2i:
-                    #print(i,j,k,now_char)
                     char_w2i[now_char]=len(char_w2i)
                     char_i2w[len(char_w2i)-1]=now_char
-                    
                 char_array[i,j,k] = char_w2i[now_char]
     return char_array,char_w2i,char_i2w
+def create_word_vocab(word_list,word_w2i,word_i2w):
+    for i in range(len(word_list)):
+      now_context=word_list[i]
+      for j in range(len(now_context)):
+          now_word=now_context[j]
+          if now_word  not in word_w2i:
+              word_w2i[now_word]=len(word_w2i)
+              word_i2w[len(word_w2i)-1]=now_word
+    return word_w2i,word_i2w
 def remove_blank(input_str):
     input_str = input_str.lstrip()
     input_str = input_str.rstrip()
@@ -122,12 +150,13 @@ def create_floder():
     GLOVE_dir = './GLOVE'
     Train_dir = './SQUAD/train'
     DEV_dir   = './SQUAD/dev'
+    TEMP_dir = './TEMP_DATA'
     check_floder(SQUAD_dir)
     check_floder(GLOVE_dir)
     check_floder(Train_dir)
     check_floder(DEV_dir)
+    check_floder(TEMP_dir)
     print('create_floder_over')
-
 def download_dataset():
 
     def download_for_url(filename,url,path):
@@ -175,7 +204,24 @@ def download_dataset():
     else:
       print(glove_filename,"is exists!")
       print("all data download over!")
+def get_embedding(glove_dir,squad_vocab,embedding_init=None,out_dim=300):
 
+    glove_length = get_line_count(glove_dir)
+    glove_embedding = np.zeros((glove_length,out_dim), dtype=np.float32)
+
+    glove_vocab,glove_embedding = load_glove_file_embedding(glove_dir,glove_embedding,max_dim=out_dim)
+
+    if embedding_init is None:
+        squad_embedding = np.zeros((len(squad_vocab.w_to_i),out_dim),dtype=np.float32)
+    else:
+        squad_embedding = np.random.normal(scale=0.01,size=(len(squad_vocab.w_to_i),out_dim)) 
+
+    squad_embedding = load_glove_to_squad_embedding(glove_vocab,squad_vocab,glove_embedding,squad_embedding)
+    
+    return squad_embedding,glove_embedding
+def delete_numpy(input_array,delete_array):
+
+    return np.delete(input_array,delete_array,0)
 def get_spacy_list():
     ner_list={'PERSON':0,
           'NORP':1,
@@ -273,3 +319,19 @@ def get_spacy_list():
           'XX':55,
           '':56,}
     return ner_list,pos_list,pos_tag_list
+def get_line_count(data_dir):
+    temp_line=0
+    try:
+        f = open(data_dir,"r",encoding='utf-8')
+    except:
+        f = open(data_dir,"r")
+    for _ in f:
+        temp_line += 1
+    print("Vocab size: %d" % temp_line)
+    f.close()
+    return temp_line
+def create_mask(in_data,pad_id,unk_id):
+    in_data_mask=np.zeros(in_data.shape,dtype=np.uint8) 
+    in_data_mask[in_data==pad_id] = 1
+    in_data_mask[in_data==unk_id] = 0
+    return in_data_mask 

@@ -36,6 +36,7 @@ def decode(score_s, score_e, top_n=1, max_len=None,mask_input=None):
 
 class R_Net(nn.Module):
     def __init__(self,
+                 char_embedding_size=300,
                  embedding_size=300,
                  hidden_size=75,
                  num_layers=3,
@@ -43,19 +44,26 @@ class R_Net(nn.Module):
                  dropout=0.2,
                  encoder_concat=True,
                  version_flag=0,
+                 char_input=True
                  ):
 
         super(R_Net, self).__init__()
         # --- R Net Structure --- #
         # Question And Passage Encoder
-        self.version_flag = version_flag
-        self.question_dim = embedding_size
-        self.context_dim = embedding_size 
-        self.batch=batch_size
-        self.hidden_size=hidden_size
-        self.attention_size=hidden_size
+        self.version_flag   = version_flag
+        self.character_dim  = char_embedding_size
+        self.char_encoder_dim = 2*hidden_size
+        self.question_dim   = embedding_size if char_input==False else embedding_size + self.char_encoder_dim
+        self.context_dim    = embedding_size if char_input==False else embedding_size + self.char_encoder_dim
+        self.batch          = batch_size
+        self.hidden_size    = hidden_size
+        self.attention_size = hidden_size
         self.encoder_concat = encoder_concat
-        # Encoder part
+
+        # Char Encoder part
+        self.P_char_gru = nn.GRU(input_size=self.character_dim,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
+        self.Q_char_gru = nn.GRU(input_size=self.character_dim,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
+        # Word Encoder part
         if encoder_concat ==True:
             self.Q_reader_gru1 = nn.GRU(input_size=self.question_dim ,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
             self.Q_reader_gru2 = nn.GRU(input_size=self.hidden_size*2,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
@@ -103,6 +111,36 @@ class R_Net(nn.Module):
         self.PN_WQu = self.WQ_u
         self.PN_V   = self.v
     #new version for pack
+    def Char_encoder(self,char_input,gru_unit,char_mask,word_mask,max_len,batch):
+
+        input_len=[]
+        batch_size=char_input.size(0)
+        for i in range(batch):
+            len_index = len(word_mask.data[i])-word_mask.data[i].sum()
+            input_len.append(len_index)     
+        input_len2=np.asarray(input_len,dtype=np.int32)
+        output_array=[]
+        for j in range(batch):
+            batch_out=[]
+            h = Variable(torch.randn(2*1, 1,self.hidden_size ))
+            h = h.cuda() if use_cuda else h
+            char_len=[]
+            for l in range(input_len2[j]):
+                char_index=len(char_mask.data[j,l])-char_mask.data[j,l,:].sum()
+                char_len.append(char_index)
+            temp_char=char_input[j,:input_len2[j]]     
+            for l in range(input_len2[j]):
+                temp_input = temp_char[l,:char_len[l]].unsqueeze(0)
+                temp2_input,h_n = gru_unit(temp_input,h)
+                h_n=h_n.view(-1).unsqueeze(0)
+                batch_out.append(h_n)
+            batch_out = torch.cat(batch_out,dim=0).unsqueeze(0)
+            batch_out = F.pad(batch_out,(0,0,0,max_len-int(input_len[j])))
+            output_array.append(batch_out)
+
+        output_array = torch.cat(output_array,dim=0)
+
+        return output_array
     def Reader_encoder(self,input,gru_unit_list,batch):
         if self.encoder_concat == True:
             h = Variable(torch.zeros(2*1, batch,self.hidden_size ))
@@ -151,8 +189,7 @@ class R_Net(nn.Module):
         vP_forward = []
         input_index = 0
 
-        temp_batch_size = max_batch_size = uP_batch[0]
-
+        temp_batch_size = max_batch_size = int(uP_batch[0])
         temp_f_hidden = Variable(torch.zeros(max_batch_size,self.hidden_size))
         temp_f_hidden = temp_f_hidden.cuda() if use_cuda else temp_f_hidden
         now_hidden = temp_f_hidden
@@ -196,7 +233,7 @@ class R_Net(nn.Module):
         temp_b_hidden = temp_b_hidden.cuda() if use_cuda else temp_b_hidden
         original_b_hidden = temp_b_hidden
         now_hidden = temp_b_hidden[:temp_batch_size,:]
-        for batch_size in reversed(uP_batch):
+        for batch_size in reversed(uP_batch.detach().numpy()):
             step_uP = uP_data[input_index-batch_size:input_index,:]   
             input_index -= batch_size                                   
             diff = batch_size - temp_batch_size
@@ -239,7 +276,7 @@ class R_Net(nn.Module):
         hP_forward = []
         input_index = 0
 
-        temp_batch_size = max_batch_size = vP_batch[0]
+        temp_batch_size = max_batch_size = int(vP_batch[0])
 
         temp_f_hidden = Variable(torch.zeros(max_batch_size,self.hidden_size))
         temp_f_hidden = temp_f_hidden.cuda() if use_cuda else temp_f_hidden
@@ -285,13 +322,13 @@ class R_Net(nn.Module):
         hP_bacward = []
         input_index = vP_data.size(0)
 
-        temp_batch_size = vP_batch[-1]
+        temp_batch_size = int(vP_batch[-1])
         temp_b_hidden = Variable(torch.zeros(max_batch_size,self.hidden_size))
         temp_b_hidden = temp_b_hidden.cuda() if use_cuda else temp_b_hidden
         original_b_hidden = temp_b_hidden
         now_hidden = temp_b_hidden[:temp_batch_size,:]
 
-        for batch_size in reversed(vP_batch):
+        for batch_size in reversed(vP_batch.detach().numpy()):
             step_vP = vP_data[input_index-batch_size:input_index,:]   # (2,450)
             
             diff = batch_size - temp_batch_size
@@ -366,8 +403,10 @@ class R_Net(nn.Module):
 
         return start,start_ori,end,end_ori,rQ
     def sort_tensor(self,input_vector,sort_idx):
+        
         return input_vector[sort_idx,:,:]
     def sort_tensor2D(self,input_vector,sort_idx):
+        
         return input_vector[sort_idx,:]
     def easy_pack(self,input_vector,input_len,sort_idx):
         input_vector = input_vector[sort_idx,:,:]
@@ -395,19 +434,36 @@ class R_Net(nn.Module):
     def easy_unpack_without_unsort(self,pack):
         pack_data , pack_len = pad_packed_sequence(pack,batch_first=True)
         return pack_data,pack_len
-    def forward(self,passage,question,p_mask,q_mask):
+    def forward(self,passage,question,p_mask,q_mask,pc,qc,pc_mask,qc_mask):
         self.batch = batch = passage.size(0)
         #print(passage.size())
         #print(question.size())
+        
+        # Passage and Question char encoder
+        uQc = self.Char_encoder(qc,self.Q_char_gru,qc_mask,q_mask,int(question.size(1)),batch)
+        uPc = self.Char_encoder(pc,self.P_char_gru,pc_mask,p_mask,int(passage.size(1)) ,batch)
+        #print(uQc.size())
+        #print(uPc.size())
+        #print(passage.size())
+        #print(question.size())
+        #os.sw('5465')
 
-        p_len = passage.size(1)
-        q_len = question.size(1)    
-        p_pack_sort_p,p_sort_idx,p_unsort_idx,sort_p_len,real_p_len = self.pack_input(passage ,p_mask)
-        q_pack_sort_q,q_sort_idx,q_unsort_idx,sort_q_len,real_q_len = self.pack_input(question,q_mask)
+        p = torch.cat([passage,uPc] ,dim=2)
+        q = torch.cat([question,uQc],dim=2)
+        #print(p.size())
+        #print(q.size())
+        p_len = p.size(1)
+        q_len = q.size(1)    
+        p_pack_sort_p,p_sort_idx,p_unsort_idx,sort_p_len,real_p_len = self.pack_input(p,p_mask)
+        q_pack_sort_q,q_sort_idx,q_unsort_idx,sort_q_len,real_q_len = self.pack_input(q,q_mask)
         p_mask = self.mask_abbr(p_mask,sort_p_len)
         q_mask = self.mask_abbr(q_mask,sort_q_len)
-       
-        # Passage and Question encoder
+        
+        #print(pc_mask.size())
+        #print(qc_mask.size())
+
+
+        # Passage and Question word encoder
         if self.encoder_concat == True:
             Q_gru_list=[self.Q_reader_gru1,self.Q_reader_gru2,self.Q_reader_gru3]
             P_gru_list=[self.P_reader_gru1,self.P_reader_gru2,self.P_reader_gru3]
@@ -416,11 +472,10 @@ class R_Net(nn.Module):
             P_gru_list=[self.P_reader_gru]
         
         uQ_pack_list = self.Reader_encoder(q_pack_sort_q,Q_gru_list,batch)
-        uP_pack_list = self.Reader_encoder(p_pack_sort_p ,P_gru_list,batch)
+        uP_pack_list = self.Reader_encoder(p_pack_sort_p,P_gru_list,batch)
         
         uQ_unpack_sort_original = self.Encoder_refix(uQ_pack_list,q_unsort_idx)
         uP_pack_sort_p          = self.Encoder_pack(uP_pack_list)
-
         q_mask_sort_p    = self.sort_tensor(q_mask.unsqueeze(2),p_sort_idx).squeeze(2)
         p_mask_sort_p    = self.sort_tensor(p_mask.unsqueeze(2),p_sort_idx).squeeze(2)    
         uQ_unpack_sort_p = self.sort_tensor(uQ_unpack_sort_original,p_sort_idx)
