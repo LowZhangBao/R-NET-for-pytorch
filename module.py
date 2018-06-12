@@ -5,6 +5,7 @@ from torch.nn.utils.rnn import pack_padded_sequence, pad_packed_sequence,PackedS
 import torch.nn.functional as F
 import math
 import numpy as np
+import datetime
 
 use_cuda = torch.cuda.is_available()
 
@@ -111,6 +112,50 @@ class R_Net(nn.Module):
         self.PN_WQu = self.WQ_u
         self.PN_V   = self.v
     #new version for pack
+    def new_char_encoder(self,char_input,gru_unit,char_mask,word_mask,max_len,batch):
+
+        new_char_input=[]
+        input_len=[]
+        char_len=[]
+        for i in range(batch):
+            len_index = len(word_mask.data[i])-word_mask.data[i].sum()
+            input_len.append(len_index)
+            for j in range(len_index):
+                char_index=len(char_mask.data[i,j])-char_mask.data[i,j,:].sum()
+                char_len.append(char_index)
+            new_char_input.append(char_input[i,:len_index])     
+        char_len2 =np.asarray(char_len,dtype=np.int32)
+        
+        new_char_input = torch.cat(new_char_input,dim=0)
+        
+        sort_idx = np.argsort(-char_len2)
+        new_char_input = new_char_input[sort_idx,:,:]
+        char_len = char_len2[sort_idx]
+        unsort_idx = np.argsort(sort_idx)
+        
+        pack_batch=new_char_input.size(0)
+        
+        new_char_input = pack_padded_sequence(new_char_input,char_len,batch_first=True)
+        
+        h = Variable(torch.rand(2*1, pack_batch,self.hidden_size))
+        h = h.cuda() if use_cuda else h
+        
+        out_char,h_n = gru_unit(new_char_input,h)
+        
+        h_n = h_n.permute(1,0,2).contiguous().view(-1,self.hidden_size*2)
+        h_n_ori = self.sort_tensor2D(h_n,unsort_idx)
+        
+        s_index=0
+        out_h_n=[]
+        for i in input_len:
+            now_h_n=h_n_ori[s_index:s_index+i,:]
+            s_index+=i
+            now_h_n = F.pad(now_h_n,(0,0,0,max_len-int(i))).unsqueeze(0)
+            out_h_n.append(now_h_n)
+        out_h_n=torch.cat(out_h_n,dim=0)
+
+        return out_h_n
+
     def Char_encoder(self,char_input,gru_unit,char_mask,word_mask,max_len,batch):
 
         input_len=[]
@@ -122,7 +167,7 @@ class R_Net(nn.Module):
         output_array=[]
         for j in range(batch):
             batch_out=[]
-            h = Variable(torch.randn(2*1, 1,self.hidden_size ))
+            h = Variable(torch.zeros(2*1, 1,self.hidden_size ))
             h = h.cuda() if use_cuda else h
             char_len=[]
             for l in range(input_len2[j]):
@@ -328,7 +373,13 @@ class R_Net(nn.Module):
         original_b_hidden = temp_b_hidden
         now_hidden = temp_b_hidden[:temp_batch_size,:]
 
-        for batch_size in reversed(vP_batch.detach().numpy()):
+        if isinstance(vP_batch,list):
+            vP_batch_fix=vP_batch
+        else:
+            vP_batch_fix=vP_batch.detach().numpy()
+            
+
+        for batch_size in reversed(vP_batch_fix):
             step_vP = vP_data[input_index-batch_size:input_index,:]   # (2,450)
             
             diff = batch_size - temp_batch_size
@@ -436,32 +487,19 @@ class R_Net(nn.Module):
         return pack_data,pack_len
     def forward(self,passage,question,p_mask,q_mask,pc,qc,pc_mask,qc_mask):
         self.batch = batch = passage.size(0)
-        #print(passage.size())
-        #print(question.size())
-        
-        # Passage and Question char encoder
-        uQc = self.Char_encoder(qc,self.Q_char_gru,qc_mask,q_mask,int(question.size(1)),batch)
-        uPc = self.Char_encoder(pc,self.P_char_gru,pc_mask,p_mask,int(passage.size(1)) ,batch)
-        #print(uQc.size())
-        #print(uPc.size())
-        #print(passage.size())
-        #print(question.size())
-        #os.sw('5465')
 
-        p = torch.cat([passage,uPc] ,dim=2)
-        q = torch.cat([question,uQc],dim=2)
-        #print(p.size())
-        #print(q.size())
+        # Passage and Question char encoder
+        new_uQc = self.new_char_encoder(qc,self.Q_char_gru,qc_mask,q_mask,int(question.size(1)),batch)
+        new_uPc = self.new_char_encoder(pc,self.P_char_gru,pc_mask,p_mask,int(passage.size(1)) ,batch)
+        p = torch.cat([passage,new_uPc] ,dim=2)
+        q = torch.cat([question,new_uQc],dim=2)
+
         p_len = p.size(1)
         q_len = q.size(1)    
         p_pack_sort_p,p_sort_idx,p_unsort_idx,sort_p_len,real_p_len = self.pack_input(p,p_mask)
         q_pack_sort_q,q_sort_idx,q_unsort_idx,sort_q_len,real_q_len = self.pack_input(q,q_mask)
         p_mask = self.mask_abbr(p_mask,sort_p_len)
         q_mask = self.mask_abbr(q_mask,sort_q_len)
-        
-        #print(pc_mask.size())
-        #print(qc_mask.size())
-
 
         # Passage and Question word encoder
         if self.encoder_concat == True:
@@ -473,7 +511,7 @@ class R_Net(nn.Module):
         
         uQ_pack_list = self.Reader_encoder(q_pack_sort_q,Q_gru_list,batch)
         uP_pack_list = self.Reader_encoder(p_pack_sort_p,P_gru_list,batch)
-        
+
         uQ_unpack_sort_original = self.Encoder_refix(uQ_pack_list,q_unsort_idx)
         uP_pack_sort_p          = self.Encoder_pack(uP_pack_list)
         q_mask_sort_p    = self.sort_tensor(q_mask.unsqueeze(2),p_sort_idx).squeeze(2)
@@ -485,21 +523,18 @@ class R_Net(nn.Module):
                                                  q_mask_sort_p,
                                                  use_Gate=True)               
         torch.cuda.empty_cache()
-
         vP_unpack_sort_p , vP_len_sort_p = pad_packed_sequence(vP_pack_sort_p,batch_first=True)
         hP_pack_sort_p = self.Self_Match_pack_fb(vP_pack_sort_p,
                                                  vP_unpack_sort_p,
                                                  p_mask_sort_p,
                                                  use_Gate=True)
         torch.cuda.empty_cache()
-
         hP_unpack_sort_p, hP_len_sort_p = self.easy_unpack_without_unsort(hP_pack_sort_p)
         start,start_ori,end,end_ori,rQ = self.PointerNet_pack(hP_unpack_sort_p,
                                                               uQ_unpack_sort_p,
                                                               p_mask_sort_p,
                                                               q_mask_sort_p)
         torch.cuda.empty_cache()
-        
         start       = self.sort_tensor2D(start    ,p_unsort_idx)
         start_ori   = self.sort_tensor2D(start_ori,p_unsort_idx)
         end         = self.sort_tensor2D(end      ,p_unsort_idx)
