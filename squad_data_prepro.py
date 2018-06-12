@@ -23,13 +23,8 @@ download_dataset()
 
 
 
-squad_data_train_dir='./SQUAD/train-v1.1.json'
-squad_data_dev_dir='./SQUAD/dev-v1.1.json'
-glove_char_dir = r'./GloVe/glove.840B.300d-char.txt'
-glove_dir = r'./GloVe/glove.840B.300d.txt'
-
-train=load_squad_file(squad_data_train_dir)
-dev =load_squad_file(squad_data_dev_dir)
+train=load_squad_file(setting.squad_data_train_dir)
+dev =load_squad_file(setting.squad_data_dev_dir)
 try:
   nlp=spacy.load('en')
 except:
@@ -223,8 +218,8 @@ for i in range(len(dev['questions'])):
 
 print('preprocess SQUAD data - char simple phase!')
 
-glove_char_length  = get_line_count(glove_char_dir)
-char_simple_vocab_w2i=load_glove_file_vocab(glove_char_dir)
+glove_char_length  = get_line_count(setting.glove_char_dir)
+char_simple_vocab_w2i=load_glove_file_vocab(setting.glove_char_dir)
 char_simple_vocab_w2i["--OOV--"]=len(char_simple_vocab_w2i)
 char_simple_vocab_w2i["--PAD--"]=len(char_simple_vocab_w2i)
 char_simple_vocab_i2w = {}
@@ -453,7 +448,7 @@ print('preprocess SQUAD word data done !')
 
 print('preprocess GloVe word embedding data!')
 
-squad_word_embedding,glove_word_embedding = get_embedding(glove_dir,word_Vocab,embedding_init=setting.word_embedding_init,out_dim=setting.word_dim)
+squad_word_embedding,glove_word_embedding = get_embedding(setting.glove_dir,word_Vocab,embedding_init=setting.word_embedding_init,out_dim=setting.word_dim)
 
 np.save(setting.SQUAD_Word_Embedding_output_dir,squad_word_embedding)
 np.save(setting.Glove_Word_Embedding_output_dir,glove_word_embedding)
@@ -462,8 +457,8 @@ print('preprocess GloVe data done!')#
 
 print('preprocess SQUAD data for simple char embedding!')
 
-squad_char_simple_embedding,glove_char_embedding = get_embedding(glove_char_dir,char_Vocab_simple,embedding_init=setting.char_embedding_init,out_dim=setting.char_dim)
-squad_char_all_embedding   ,_                    = get_embedding(glove_char_dir,char_Vocab_all   ,embedding_init=setting.char_embedding_init,out_dim=setting.char_dim)
+squad_char_simple_embedding,glove_char_embedding = get_embedding(setting.glove_char_dir,char_Vocab_simple,embedding_init=setting.char_embedding_init,out_dim=setting.char_dim)
+squad_char_all_embedding   ,_                    = get_embedding(setting.glove_char_dir,char_Vocab_all   ,embedding_init=setting.char_embedding_init,out_dim=setting.char_dim)
 
 
 np.save(setting.SQUAD_Char_simple_Embedding_output_dir,squad_char_simple_embedding)

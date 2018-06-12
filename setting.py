@@ -14,6 +14,11 @@ dev_q_max=None
 #q_max = None or specific number
 #c_max = None or specific number
 
+squad_data_train_dir=r'./SQUAD/train-v1.1.json'
+squad_data_dev_dir=r'./SQUAD/dev-v1.1.json'
+glove_char_dir = r'./GloVe/glove.840B.300d-char.txt'
+glove_dir = r'./GloVe/glove.840B.300d.txt'
+
 Glove_Word_Embedding_output_dir  = r"./Glove/glove_word_embedding.npy"
 SQUAD_Word_Embedding_output_dir  = r"./SQUAD/squad_word_embedding.npy"
 Glove_Char_Embedding_output_dir  = r"./Glove/glove_char_embedding.npy"

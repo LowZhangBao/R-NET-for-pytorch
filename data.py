@@ -1,7 +1,7 @@
 import pickle
 import torch
 from torch.utils.data import Dataset
-
+import setting
 
 class DataEngine(Dataset):
     def __init__(self,P,Q,A,P_mask,Q_mask,word_embedding,Pc=None,Qc=None,Pc_mask=None,Qc_mask=None,char_embedding=None):
@@ -40,19 +40,72 @@ class DataEngine(Dataset):
                                                  self.Q_mask[idx,:],
                                                  idx)
     def vectorize_for_squad_word(self, P,Q,A,P_mask,Q_mask,idx):
-        p = torch.FloatTensor(self.emb[P,:])
-        q = torch.FloatTensor(self.emb[Q,:])
+        p = torch.FloatTensor(self.emb[P,:setting.word_dim])
+        q = torch.FloatTensor(self.emb[Q,:setting.word_dim])
         p_m = torch.ByteTensor(P_mask)
         q_m = torch.ByteTensor(Q_mask)
         ans_offset = torch.LongTensor(A)
         _=None
         return p, q, ans_offset,p_m,q_m,_,_,_,_,idx
-
     def vectorize_for_squad(self, P,Q,A,P_mask,Q_mask,Pc,Qc,Pc_mask,Qc_mask,idx):
-        p = torch.FloatTensor(self.emb[P,:])
-        q = torch.FloatTensor(self.emb[Q,:])
-        pc = torch.FloatTensor(self.char_emb[Pc,:])
-        qc = torch.FloatTensor(self.char_emb[Qc,:])
+        p = torch.FloatTensor(self.emb[P,:setting.word_dim])
+        q = torch.FloatTensor(self.emb[Q,:setting.word_dim])
+        pc = torch.FloatTensor(self.char_emb[Pc,:setting.char_dim])
+        qc = torch.FloatTensor(self.char_emb[Qc,:setting.char_dim])
+        p_m = torch.ByteTensor(P_mask)
+        q_m = torch.ByteTensor(Q_mask)
+        pc_m = torch.ByteTensor(Pc_mask)
+        qc_m = torch.ByteTensor(Qc_mask)
+        ans_offset = torch.LongTensor(A)
+        return p, q, ans_offset,p_m,q_m,pc,qc,pc_m,qc_m,idx
+
+class DataEngine_no_emb(Dataset):
+    def __init__(self,P,Q,A,P_mask,Q_mask,Pc=None,Qc=None,Pc_mask=None,Qc_mask=None):
+        self.P=P
+        self.Q=Q
+        self.A=A        
+        self.P_mask=P_mask
+        self.Q_mask=Q_mask
+        if Pc is not None and Qc is not None :
+            self.Pc=Pc
+            self.Qc=Qc
+            self.Pc_mask=Pc_mask
+            self.Qc_mask=Qc_mask
+    def __len__(self):
+        return self.P.shape[0]
+
+    def __getitem__(self, idx):
+        if self.Pc is not None or self.Qc is not None:
+            return self.vectorize_for_squad(self.P[idx,:],
+                                            self.Q[idx,:],
+                                            self.A[idx,:],
+                                            self.P_mask[idx,:],
+                                            self.Q_mask[idx,:],
+                                            self.Pc[idx,:],
+                                            self.Qc[idx,:],
+                                            self.Pc_mask[idx,:],
+                                            self.Qc_mask[idx,:],
+                                            idx)
+        else:
+            return self.vectorize_for_squad_word(self.P[idx,:],
+                                                 self.Q[idx,:],
+                                                 self.A[idx,:],
+                                                 self.P_mask[idx,:],
+                                                 self.Q_mask[idx,:],
+                                                 idx)
+    def vectorize_for_squad_word(self, P,Q,A,P_mask,Q_mask,idx):
+        p = torch.FloatTensor(P)
+        q = torch.FloatTensor(Q)
+        p_m = torch.ByteTensor(P_mask)
+        q_m = torch.ByteTensor(Q_mask)
+        ans_offset = torch.LongTensor(A)
+        _=None
+        return p, q, ans_offset,p_m,q_m,_,_,_,_,idx
+    def vectorize_for_squad(self, P,Q,A,P_mask,Q_mask,Pc,Qc,Pc_mask,Qc_mask,idx):
+        p = torch.FloatTensor(P)
+        q = torch.FloatTensor(Q)
+        pc = torch.FloatTensor(Pc)
+        qc = torch.FloatTensor(Qc)
         p_m = torch.ByteTensor(P_mask)
         q_m = torch.ByteTensor(Q_mask)
         pc_m = torch.ByteTensor(Pc_mask)
@@ -79,7 +132,7 @@ class DataEngine_for_prediction(Dataset):
         return self.P.shape[0]
 
     def __getitem__(self, idx):
-        if Pc is not None or Qc is not None:
+        if self.Pc is not None or self.Qc is not None:
             return self.vectorize_for_squad(self.P[idx,:],
                                             self.Q[idx,:],
                                             self.A[idx,:],
@@ -102,17 +155,18 @@ class DataEngine_for_prediction(Dataset):
 
 
     def vectorize_for_squad_word(self, P,Q,A,P_mask,Q_mask,Q_ids,idx):
-        p = torch.FloatTensor(self.emb[P,:])
-        q = torch.FloatTensor(self.emb[Q,:])
+        p = torch.FloatTensor(self.emb[P,:setting.word_dim])
+        q = torch.FloatTensor(self.emb[Q,:setting.word_dim])
         p_m = torch.ByteTensor(P_mask)
         q_m = torch.ByteTensor(Q_mask)
         ans_offset = torch.LongTensor(A)
-        return p, q, ans_offset,p_m,q_m,Q_ids,idx
+        _ = None
+        return p, q, ans_offset,p_m,q_m,_,_,_,_,Q_ids,idx
     def vectorize_for_squad(self, P,Q,A,P_mask,Q_mask,Pc,Qc,Pc_mask,Qc_mask,Q_ids,idx):
-        p = torch.FloatTensor(self.emb[P,:])
-        q = torch.FloatTensor(self.emb[Q,:])
-        pc = torch.FloatTensor(self.char_emb[Pc,:])
-        qc = torch.FloatTensor(self.char_emb[Qc,:])
+        p = torch.FloatTensor(self.emb[P,:setting.word_dim])
+        q = torch.FloatTensor(self.emb[Q,:setting.word_dim])
+        pc = torch.FloatTensor(self.char_emb[Pc,:setting.char_dim])
+        qc = torch.FloatTensor(self.char_emb[Qc,:setting.char_dim])
         p_m = torch.ByteTensor(P_mask)
         q_m = torch.ByteTensor(Q_mask)
         pc_m = torch.ByteTensor(Pc_mask)

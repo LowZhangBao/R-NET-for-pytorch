@@ -70,8 +70,7 @@ if __name__ == '__main__':
     dev_Q_char_mask   = create_mask(dev_Q_c,char_PAD_ID,char_UNK_ID)
     
 
-    Word_Embedding_output_dir = r"./SQUAD/squad_word_embedding.npy"
-    Char_Embedding_output_dir = r"./SQUAD/squad_char_embedding.npy"
+
     word_embedding=np.load(setting.SQUAD_Word_Embedding_output_dir)
     if setting.use_all_char_vocab is True:
         char_embedding=np.load(setting.SQUAD_Char_all_Embedding_output_dir)
@@ -112,7 +111,7 @@ if __name__ == '__main__':
                                               dev_P_char_mask,
                                               dev_Q_char_mask,
                                               char_embedding),
-                              batch_size=args.batch_size,
+                              batch_size=int(args.batch_size/2),
                               shuffle=True,
                               num_workers=0,
                               pin_memory=use_cuda)
@@ -171,7 +170,7 @@ if __name__ == '__main__':
                         ( epoch, batch, len(train_engine), loss1.data[0],loss2.data[0],f1_score, exact_match_score,batch_time,end_time))
 
                 if batch % args.save_batch_freq==0:
-                    torch.save(R_net, 'module'+'_now_epoch_'+str(epoch)+'now_batch_'+str(batch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(f1_score)+'_em_'+str(exact_match_score)+'.cpt')
+                    torch.save(R_net, 'module'+'_char_input_'+str(args.char_input)+'_now_epoch_'+str(epoch)+'now_batch_'+str(batch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(f1_score)+'_em_'+str(exact_match_score)+'.cpt')
 
             batch +=1
         if args.dev_phase==True:
@@ -202,8 +201,8 @@ if __name__ == '__main__':
                 if epoch % args.save_freq == 0:
                     vad_f1 = valid_f1/len(valid_engine)
                     vad_em = valid_exact/len(valid_engine)
-                    torch.save(R_net, 'module'+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
-    torch.save(R_net, 'module_final'+'_concat_'+str(args.encoder_concat)+'_f1_'+str(valid_f1)+'_em_'+str(valid_exact)+'.cpt')
+                    torch.save(R_net, 'module'+'_char_input_'+str(args.char_input)+'_now_epoch_'+str(epoch)+'_concat_'+str(args.encoder_concat)+'_batch_'+str(args.batch_size)+'_f1_'+str(vad_f1)+'_em_'+str(vad_em)+'.cpt')
+    torch.save(R_net, 'module_final'+'_char_input_'+str(args.char_input)+'_concat_'+str(args.encoder_concat)+'_f1_'+str(valid_f1)+'_em_'+str(valid_exact)+'.cpt')
     
 
 
