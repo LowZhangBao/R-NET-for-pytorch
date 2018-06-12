@@ -241,8 +241,8 @@ char_Vocab_simple.save(setting.char_simple_vocab_w2i_dir,setting.char_simple_voc
 
 train_P_char_simple = create_char_array(list_context_char     ,char_simple_vocab_w2i,setting.train_p_max,setting.c_max)
 train_Q_char_simple = create_char_array(list_question_char    ,char_simple_vocab_w2i,setting.train_q_max,setting.c_max)
-dev_P_char_simple   = create_char_array(dev_list_context_char ,char_simple_vocab_w2i,setting.train_p_max,setting.c_max)
-dev_Q_char_simple   = create_char_array(dev_list_question_char,char_simple_vocab_w2i,setting.train_q_max,setting.c_max)
+dev_P_char_simple   = create_char_array(dev_list_context_char ,char_simple_vocab_w2i,setting.dev_p_max,setting.c_max)
+dev_Q_char_simple   = create_char_array(dev_list_question_char,char_simple_vocab_w2i,setting.dev_q_max,setting.c_max)
 
 
 print('Done!')
@@ -256,8 +256,8 @@ char_all_vocab_i2w[0]="--OOV--"
 char_all_vocab_i2w[1]="--PAD--"
 train_P_char_all,char_all_vocab_w2i,char_all_vocab_i2w = create_char_vocab(list_context_char     ,char_all_vocab_w2i,char_all_vocab_i2w,setting.train_p_max,setting.c_max)
 train_Q_char_all,char_all_vocab_w2i,char_all_vocab_i2w = create_char_vocab(list_question_char    ,char_all_vocab_w2i,char_all_vocab_i2w,setting.train_q_max,setting.c_max)
-dev_P_char_all,char_all_vocab_w2i,char_all_vocab_i2w   = create_char_vocab(dev_list_context_char ,char_all_vocab_w2i,char_all_vocab_i2w,setting.train_p_max,setting.c_max)
-dev_Q_char_all,char_all_vocab_w2i,char_all_vocab_i2w   = create_char_vocab(dev_list_question_char,char_all_vocab_w2i,char_all_vocab_i2w,setting.train_q_max,setting.c_max)
+dev_P_char_all,char_all_vocab_w2i,char_all_vocab_i2w   = create_char_vocab(dev_list_context_char ,char_all_vocab_w2i,char_all_vocab_i2w,setting.dev_p_max,setting.c_max)
+dev_Q_char_all,char_all_vocab_w2i,char_all_vocab_i2w   = create_char_vocab(dev_list_question_char,char_all_vocab_w2i,char_all_vocab_i2w,setting.dev_q_max,setting.c_max)
 
 char_Vocab_all = Vocab_class(char_all_vocab_w2i,char_all_vocab_i2w)
 char_Vocab_all.save(setting.char_all_vocab_w2i_dir ,setting.char_all_vocab_i2w_dir)
