@@ -228,7 +228,6 @@ for index,word in enumerate(char_simple_vocab_w2i):
     char_simple_vocab_i2w[char_simple_vocab_w2i[word]]=word
 
 
-c
 char_Vocab_simple = Vocab_class(char_simple_vocab_w2i,char_simple_vocab_i2w)
 char_Vocab_simple.save(setting.char_simple_vocab_w2i_dir,setting.char_simple_vocab_i2w_dir)
 
@@ -356,20 +355,20 @@ print('load data to training data _ dev phase')
 for i in range(dev_max_num):
     temp_p = dev_list_context[i]
     temp_p = [w2i[word] for word in temp_p]
-    temp_p = np.array(Vocab.create_padded_list(temp_p,dev_max_p_num),dtype=np.uint32)
-    temp_pos = np.array(Vocab.create_padded_list(dev_list_context_pos[i],dev_max_p_num,pos_list['']       ),dtype=np.uint8)
-    temp_tag = np.array(Vocab.create_padded_list(dev_list_context_tag[i],dev_max_p_num,pos_tag_list['NIL']),dtype=np.uint8) 
-    temp_ner = np.array(Vocab.create_padded_list(dev_list_context_ner[i],dev_max_p_num,ner_list['']       ),dtype=np.uint8)
+    temp_p = np.array(word_Vocab.create_padded_list(temp_p,dev_max_p_num),dtype=np.uint32)
+    temp_pos = np.array(word_Vocab.create_padded_list(dev_list_context_pos[i],dev_max_p_num,pos_list['']       ),dtype=np.uint8)
+    temp_tag = np.array(word_Vocab.create_padded_list(dev_list_context_tag[i],dev_max_p_num,pos_tag_list['NIL']),dtype=np.uint8) 
+    temp_ner = np.array(word_Vocab.create_padded_list(dev_list_context_ner[i],dev_max_p_num,ner_list['']       ),dtype=np.uint8)
     dev_P[i,:] = temp_p
     dev_P_pos[i,:] = temp_pos
     dev_P_tag[i,:] = temp_tag
     dev_P_ner[i,:] = temp_ner
     temp_q = dev_list_question[i]
     temp_q = [w2i[word] for word in temp_q]
-    temp_q = np.array(Vocab.create_padded_list(temp_q,dev_max_q_num),dtype=np.uint32)
-    temp_pos = np.array(Vocab.create_padded_list(dev_list_question_pos[i],dev_max_q_num,pos_list['']       ),dtype=np.uint8)
-    temp_tag = np.array(Vocab.create_padded_list(dev_list_question_tag[i],dev_max_q_num,pos_tag_list['NIL']),dtype=np.uint8) 
-    temp_ner = np.array(Vocab.create_padded_list(dev_list_question_ner[i],dev_max_q_num,ner_list['']       ),dtype=np.uint8)
+    temp_q = np.array(word_Vocab.create_padded_list(temp_q,dev_max_q_num),dtype=np.uint32)
+    temp_pos = np.array(word_Vocab.create_padded_list(dev_list_question_pos[i],dev_max_q_num,pos_list['']       ),dtype=np.uint8)
+    temp_tag = np.array(word_Vocab.create_padded_list(dev_list_question_tag[i],dev_max_q_num,pos_tag_list['NIL']),dtype=np.uint8) 
+    temp_ner = np.array(word_Vocab.create_padded_list(dev_list_question_ner[i],dev_max_q_num,ner_list['']       ),dtype=np.uint8)
     dev_Q[i,:] = temp_q
     dev_Q_pos[i,:] = temp_pos
     dev_Q_tag[i,:] = temp_tag

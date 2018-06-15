@@ -7,7 +7,12 @@ import requests
 import zipfile
 import numpy as np
 import setting
+import torch
+from torch.utils.data import DataLoader
+import data
+
 from Vocab import Vocab_class
+
 def load_squad_file(file_name):
     data = json.load(open(file_name, 'r'))['data']
     output = {'qids': [], 'questions': [], 'answers': [],
@@ -34,15 +39,15 @@ def load_squad_data():
     dev_Q_char_dir   = setting.dev_Q_char_all_dir if setting.use_all_char_vocab==True else setting.dev_Q_char_simple_dir
     dev_A_dir        = setting.dev_A_dir
 
-    train_P   = np.load(train_P_dir)
-    train_Q   = np.load(train_Q_dir)
-    train_P_c = np.load(train_P_char_dir)
-    train_Q_c = np.load(train_Q_char_dir)
+    train_P   = np.load(train_P_dir).astype(np.int32)
+    train_Q   = np.load(train_Q_dir).astype(np.int32)
+    train_P_c = np.load(train_P_char_dir).astype(np.int32)
+    train_Q_c = np.load(train_Q_char_dir).astype(np.int32)
     train_A   = np.load(train_A_dir).astype(np.float32)
-    dev_P     = np.load(dev_P_dir)
-    dev_Q     = np.load(dev_Q_dir)
-    dev_P_c   = np.load(dev_P_char_dir)
-    dev_Q_c   = np.load(dev_Q_char_dir)
+    dev_P     = np.load(dev_P_dir).astype(np.int32)
+    dev_Q     = np.load(dev_Q_dir).astype(np.int32)
+    dev_P_c   = np.load(dev_P_char_dir).astype(np.int32)
+    dev_Q_c   = np.load(dev_Q_char_dir).astype(np.int32)
     dev_A     = np.load(dev_A_dir).astype(np.float32)
     
 
@@ -140,22 +145,20 @@ def remove_blank(input_str):
     input_str = input_str.lstrip()
     input_str = input_str.rstrip()
     return input_str
-def create_floder():
-
-    def check_floder(floder_dir):
-        if not os.path.exists(floder_dir):
+def create_floder_dir(floder_dir):
+    if not os.path.exists(floder_dir):
             os.mkdir(floder_dir)
-
-    SQUAD_dir = './SQUAD'
-    GLOVE_dir = './GLOVE'
-    Train_dir = './SQUAD/train'
-    DEV_dir   = './SQUAD/dev'
-    TEMP_dir = './TEMP_DATA'
-    check_floder(SQUAD_dir)
-    check_floder(GLOVE_dir)
-    check_floder(Train_dir)
-    check_floder(DEV_dir)
-    check_floder(TEMP_dir)
+def create_floder():
+    create_floder_dir(setting.SQUAD_dir)
+    create_floder_dir(setting.GLOVE_dir)
+    create_floder_dir(setting.SQUAD_v1_dir)
+    create_floder_dir(setting.SQUAD_v2_dir)
+    create_floder_dir(setting.Train_v1_dir)
+    create_floder_dir(setting.Train_v2_dir)
+    create_floder_dir(setting.DEV_v1_dir)
+    create_floder_dir(setting.DEV_v2_dir)
+    create_floder_dir(setting.Model_dir)
+    create_floder_dir(setting.TEMP_dir)
     print('create_floder_over')
 def download_dataset():
 
@@ -176,31 +179,25 @@ def download_dataset():
         else:
           print(filename,"is exists!")
 
-    train_filename = "train-v1.1.json"
-    dev_filename = "dev-v1.1.json"
-    glove_char_filename="glove.840B.300d-char.txt"
-    glove_zip = "glove.840B.300d.zip"
-    glove_filename = "glove.840B.300d.txt"
+    download_for_url(setting.train_v1_filename,setting.train_url, setting.SQUAD_v1_dir)
 
-    glove_url = "http://nlp.stanford.edu/data/"
-    glove_char_url = "https://raw.githubusercontent.com/minimaxir/char-embeddings/master/"
-    train_url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
-    dev_url  = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
+    download_for_url(setting.dev_v1_filename  ,setting.dev_url  , setting.SQUAD_v1_dir)
 
-    download_for_url(train_filename,train_url, './SQUAD/')
+    download_for_url(setting.train_v2_filename,setting.train_url, setting.SQUAD_v2_dir)
 
-    download_for_url(dev_filename  ,dev_url  , './SQUAD/')
+    download_for_url(setting.dev_v2_filename  ,setting.dev_url  , setting.SQUAD_v2_dir)
 
-    download_for_url(glove_char_filename,glove_char_url,'./Glove')
+
+    download_for_url(setting.glove_char_filename,setting.glove_char_url,'./Glove')
     
 
-    if not os.path.exists(os.path.join('./GloVe/',glove_filename)):
-        download_for_url(glove_zip,glove_url, './GloVe/')
+    if not os.path.exists(os.path.join('./GloVe/',setting.glove_filename)):
+        download_for_url(setting.glove_zip,setting.glove_url, './GloVe/')
 
-        zip_ref = zipfile.ZipFile(os.path.join('./GloVe/',glove_zip), 'r')
+        zip_ref = zipfile.ZipFile(os.path.join('./GloVe/',setting.glove_zip), 'r')
         zip_ref.extractall('./Glove/')
         zip_ref.close()
-        os.remove(os.path.join('./GloVe/',glove_zip))
+        os.remove(os.path.join('./GloVe/',setting.glove_zip))
     else:
       print(glove_filename,"is exists!")
       print("all data download over!")
@@ -330,6 +327,41 @@ def get_line_count(data_dir):
     print("Vocab size: %d" % temp_line)
     f.close()
     return temp_line
+def get_data_engine(emb_flag,P,Q,A,Pm,Qm,Pc,Qc,Pcm,Qcm,Q_ids,word_emb=None,char_emb=None,batch=32,use_cuda=True):
+    if emb_flag==True:
+        Data_engine = DataLoader(data.DataEngine(P,
+                                                  Q,
+                                                  A,
+                                                  Pm,
+                                                  Qm,
+                                                  word_emb,
+                                                  Q_ids,
+                                                  Pc,
+                                                  Qc,
+                                                  Pcm,
+                                                  Qcm,
+                                                  char_emb),
+                                  batch_size=batch,
+                                  shuffle=True,
+                                  num_workers=0,
+                                  pin_memory=use_cuda)
+    else:
+        Data_engine = DataLoader(data.DataEngine_no_emb( P,
+                                                  Q,
+                                                  A,
+                                                  Pm,
+                                                  Qm,
+                                                  Q_ids,
+                                                  Pc,
+                                                  Qc,
+                                                  Pcm,
+                                                  Qcm),
+                                  batch_size=batch,
+                                  shuffle=True,
+                                  num_workers=0,
+                                  pin_memory=use_cuda)
+    return Data_engine  
+
 def create_mask(in_data,pad_id,unk_id):
     in_data_mask=np.zeros(in_data.shape,dtype=np.uint8) 
     in_data_mask[in_data==pad_id] = 1

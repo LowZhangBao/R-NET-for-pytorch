@@ -45,7 +45,10 @@ class R_Net(nn.Module):
                  dropout=0.2,
                  encoder_concat=True,
                  version_flag=0,
-                 char_input=True
+                 char_input=True,
+                 emb_input=True,
+                 word_mat=None,
+                 char_mat=None
                  ):
 
         super(R_Net, self).__init__()
@@ -60,7 +63,17 @@ class R_Net(nn.Module):
         self.hidden_size    = hidden_size
         self.attention_size = hidden_size
         self.encoder_concat = encoder_concat
+        self.char_input = char_input
+        self.emb_input = emb_input
 
+        # Embedding matrix part
+        if self.emb_input == False:
+            self.char_emb = nn.Embedding(char_mat.shape[0],char_mat.shape[1])
+            self.char_emb.weight.data.copy_(torch.from_numpy(char_mat))
+            self.char_emb.weight.requires_grad=False
+            self.word_emb = nn.Embedding(word_mat.shape[0],word_mat.shape[1])
+            self.word_emb.weight.data.copy_(torch.from_numpy(word_mat))
+            self.word_emb.weight.requires_grad=False
         # Char Encoder part
         self.P_char_gru = nn.GRU(input_size=self.character_dim,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
         self.Q_char_gru = nn.GRU(input_size=self.character_dim,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
@@ -111,7 +124,7 @@ class R_Net(nn.Module):
         self.PN_Wah = self.Wa_h
         self.PN_WQu = self.WQ_u
         self.PN_V   = self.v
-    #new version for pack
+    #new version for pac
     def new_char_encoder(self,char_input,gru_unit,char_mask,word_mask,max_len,batch):
 
         new_char_input=[]
@@ -155,7 +168,6 @@ class R_Net(nn.Module):
         out_h_n=torch.cat(out_h_n,dim=0)
 
         return out_h_n
-
     def Char_encoder(self,char_input,gru_unit,char_mask,word_mask,max_len,batch):
 
         input_len=[]
@@ -487,20 +499,30 @@ class R_Net(nn.Module):
         return pack_data,pack_len
     def forward(self,passage,question,p_mask,q_mask,pc,qc,pc_mask,qc_mask):
         self.batch = batch = passage.size(0)
-
+        if self.emb_input == False:
+            passage=self.word_emb(passage)
+            question=self.word_emb(question)
         # Passage and Question char encoder
-        new_uQc = self.new_char_encoder(qc,self.Q_char_gru,qc_mask,q_mask,int(question.size(1)),batch)
-        new_uPc = self.new_char_encoder(pc,self.P_char_gru,pc_mask,p_mask,int(passage.size(1)) ,batch)
-        p = torch.cat([passage,new_uPc] ,dim=2)
-        q = torch.cat([question,new_uQc],dim=2)
 
+        if self.char_input==True:
+            if self.emb_input == False:
+                pc=self.char_emb(pc)
+                qc=self.char_emb(qc)
+            new_uQc = self.new_char_encoder(qc,self.Q_char_gru,qc_mask,q_mask,int(question.size(1)),batch)
+            new_uPc = self.new_char_encoder(pc,self.P_char_gru,pc_mask,p_mask,int(passage.size(1)) ,batch)
+            p = torch.cat([passage,new_uPc] ,dim=2)
+            q = torch.cat([question,new_uQc],dim=2)
+        else:
+            p = passage
+            q = question
+        
         p_len = p.size(1)
         q_len = q.size(1)    
         p_pack_sort_p,p_sort_idx,p_unsort_idx,sort_p_len,real_p_len = self.pack_input(p,p_mask)
         q_pack_sort_q,q_sort_idx,q_unsort_idx,sort_q_len,real_q_len = self.pack_input(q,q_mask)
         p_mask = self.mask_abbr(p_mask,sort_p_len)
         q_mask = self.mask_abbr(q_mask,sort_q_len)
-
+        
         # Passage and Question word encoder
         if self.encoder_concat == True:
             Q_gru_list=[self.Q_reader_gru1,self.Q_reader_gru2,self.Q_reader_gru3]
@@ -509,6 +531,7 @@ class R_Net(nn.Module):
             Q_gru_list=[self.Q_reader_gru]
             P_gru_list=[self.P_reader_gru]
         
+
         uQ_pack_list = self.Reader_encoder(q_pack_sort_q,Q_gru_list,batch)
         uP_pack_list = self.Reader_encoder(p_pack_sort_p,P_gru_list,batch)
 
@@ -517,12 +540,14 @@ class R_Net(nn.Module):
         q_mask_sort_p    = self.sort_tensor(q_mask.unsqueeze(2),p_sort_idx).squeeze(2)
         p_mask_sort_p    = self.sort_tensor(p_mask.unsqueeze(2),p_sort_idx).squeeze(2)    
         uQ_unpack_sort_p = self.sort_tensor(uQ_unpack_sort_original,p_sort_idx)
+        
 
         vP_pack_sort_p   = self.QP_Match_pack_fb(uP_pack_sort_p,
                                                  uQ_unpack_sort_p,
                                                  q_mask_sort_p,
                                                  use_Gate=True)               
         torch.cuda.empty_cache()
+
         vP_unpack_sort_p , vP_len_sort_p = pad_packed_sequence(vP_pack_sort_p,batch_first=True)
         hP_pack_sort_p = self.Self_Match_pack_fb(vP_pack_sort_p,
                                                  vP_unpack_sort_p,
@@ -535,9 +560,9 @@ class R_Net(nn.Module):
                                                               p_mask_sort_p,
                                                               q_mask_sort_p)
         torch.cuda.empty_cache()
+        
         start       = self.sort_tensor2D(start    ,p_unsort_idx)
         start_ori   = self.sort_tensor2D(start_ori,p_unsort_idx)
         end         = self.sort_tensor2D(end      ,p_unsort_idx)
         end_ori     = self.sort_tensor2D(end_ori  ,p_unsort_idx)
-
         return start,start_ori,end,end_ori

@@ -14,7 +14,7 @@ from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from torch import optim
 from Vocab import Vocab_class   
-from util import load_squad_data,create_mask
+from util import load_squad_data,create_mask,get_data_engine
 from module import R_Net,decode
 from metrics import batch_score
 
@@ -23,6 +23,10 @@ bug_flag=True
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--model_dir', type=str, default='model.cpt', help='the model dir')
+parser.add_argument('--batch_size', type=int, default=32, help='the size of batch [32]')
+parser.add_argument('--char_input',type=int,default=1,help='use char encoder input?')
+parser.add_argument('--emb_input',type=int,default=1,help='emb input? use DataLoader create embedding representation?')
+
 parser.add_argument('--output_name',type=str,default='prediction_anser.json',help='the output name')
 args = parser.parse_args()
 
@@ -30,19 +34,20 @@ args = parser.parse_args()
 if __name__ == '__main__':
 
     train_P,train_Q,train_P_c,train_Q_c,train_A,dev_P,dev_Q,dev_P_c,dev_Q_c,dev_A = load_squad_data()
-    
-    dev_Q_id_dir = r"./SQUAD/dev/dev_Q_id.npy"
-    dev_Q_id_to_qid_dir=r"./SQUAD/dev/dev_id_to_qid.pkl"
-
-    dev_Q_id = np.load(dev_Q_id_dir)
+ 
     word_Vocab = Vocab_class()
     word_Vocab.load(setting.word_vocab_w2i_dir,setting.word_vocab_i2w_dir)
+    word_embedding=np.load(setting.SQUAD_Word_Embedding_output_dir)
+
+    #Get char Vocab and Embedding
+
     char_Vocab  = Vocab_class()
     if setting.use_all_char_vocab is True:
         char_Vocab.load(setting.char_all_vocab_w2i_dir   ,setting.char_all_vocab_i2w_dir)
+        char_embedding=np.load(setting.SQUAD_Char_all_Embedding_output_dir)
     else:
         char_Vocab.load(setting.char_simple_vocab_w2i_dir,setting.char_simple_vocab_i2w_dir)
-
+        char_embedding=np.load(setting.SQUAD_Char_simple_Embedding_output_dir)
 
     word_PAD_ID = word_Vocab.PAD_ID
     word_UNK_ID = word_Vocab.UNK_ID
@@ -50,36 +55,33 @@ if __name__ == '__main__':
     char_UNK_ID = char_Vocab.UNK_ID
     dev_P_mask   = create_mask(dev_P,word_PAD_ID,word_UNK_ID)
     dev_Q_mask   = create_mask(dev_Q,word_PAD_ID,word_UNK_ID)
-
-
     dev_P_char_mask   = create_mask(dev_P_c,char_PAD_ID,char_UNK_ID)
     dev_Q_char_mask   = create_mask(dev_Q_c,char_PAD_ID,char_UNK_ID)
 
-    with open(dev_Q_id_to_qid_dir,'rb') as f:
+    with open(setting.dev_Q_id_to_qid_dir,'rb') as f:
         dev_id_to_qid = pickle.load(f)
-    embedding=np.load(Embedding_output_dir)
+    dev_Q_id = np.load(setting.dev_Q_id_dir)
+
         
+    print('Word Vocab size: %d | Char Vocab size: %d | Max context: %d | Max question: %d'%(
+          word_embedding.shape[0],char_embedding.shape[0], dev_P.shape[1], dev_Q.shape[1]))
+    valid_engine = get_data_engine(args.emb_input,  
+                                            dev_P,  
+                                            dev_Q,  
+                                            dev_A,  
+                                            dev_P_mask,  
+                                            dev_Q_mask,  
+                                            dev_P_c,  
+                                            dev_Q_c,  
+                                            dev_P_char_mask,  
+                                            dev_Q_char_mask,  
+                                            dev_Q_id,
+                                            word_embedding,
+                                            char_embedding,
+                                            args.batch_size,
+                                            use_cuda)
 
-    print('Embedding size:',embedding.shape)
 
-    print('Vocab size: %d | Max context: %d | Max question: %d'%(
-          embedding.shape[0], dev_P.shape[1], dev_Q.shape[1]))
-    valid_engine = DataLoader(data.DataEngine_for_prediction( dev_P,
-                                                              dev_Q,
-                                                              dev_A,
-                                                              dev_P_mask,
-                                                              dev_Q_mask,
-                                                              word_embedding,
-                                                              dev_Q_id, 
-                                                              dev_P_c,
-                                                              dev_Q_c,
-                                                              dev_P_char_mask,
-                                                              dev_Q_char_mask,
-                                                              char_embedding),
-                              batch_size=10,
-                              shuffle=True,
-                              num_workers=0,
-                              pin_memory=use_cuda)
 
     R_net = torch.load(args.model_dir)
 
