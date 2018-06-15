@@ -149,16 +149,23 @@ def create_floder_dir(floder_dir):
     if not os.path.exists(floder_dir):
             os.mkdir(floder_dir)
 def create_floder():
-    create_floder_dir(setting.SQUAD_dir)
-    create_floder_dir(setting.GLOVE_dir)
-    create_floder_dir(setting.SQUAD_v1_dir)
-    create_floder_dir(setting.SQUAD_v2_dir)
-    create_floder_dir(setting.Train_v1_dir)
-    create_floder_dir(setting.Train_v2_dir)
-    create_floder_dir(setting.DEV_v1_dir)
-    create_floder_dir(setting.DEV_v2_dir)
-    create_floder_dir(setting.Model_dir)
-    create_floder_dir(setting.TEMP_dir)
+
+    def check_floder(floder_dir):
+        if not os.path.exists(floder_dir):
+            os.mkdir(floder_dir)
+
+    SQUAD_dir = './SQUAD'
+    GLOVE_dir = './GLOVE'
+    Train_dir = './SQUAD/train'
+    DEV_dir   = './SQUAD/dev'
+    Model_dir = './Model_save'
+    TEMP_dir  = './TEMP_DATA'
+    check_floder(SQUAD_dir)
+    check_floder(GLOVE_dir)
+    check_floder(Train_dir)
+    check_floder(DEV_dir)
+    check_floder(Model_dir)
+    check_floder(TEMP_dir)
     print('create_floder_over')
 def download_dataset():
 
@@ -179,25 +186,31 @@ def download_dataset():
         else:
           print(filename,"is exists!")
 
-    download_for_url(setting.train_v1_filename,setting.train_url, setting.SQUAD_v1_dir)
+    train_filename = "train-v1.1.json"
+    dev_filename = "dev-v1.1.json"
+    glove_char_filename="glove.840B.300d-char.txt"
+    glove_zip = "glove.840B.300d.zip"
+    glove_filename = "glove.840B.300d.txt"
 
-    download_for_url(setting.dev_v1_filename  ,setting.dev_url  , setting.SQUAD_v1_dir)
+    glove_url = "http://nlp.stanford.edu/data/"
+    glove_char_url = "https://raw.githubusercontent.com/minimaxir/char-embeddings/master/"
+    train_url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
+    dev_url  = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
 
-    download_for_url(setting.train_v2_filename,setting.train_url, setting.SQUAD_v2_dir)
+    download_for_url(train_filename,train_url, './SQUAD/')
 
-    download_for_url(setting.dev_v2_filename  ,setting.dev_url  , setting.SQUAD_v2_dir)
+    download_for_url(dev_filename  ,dev_url  , './SQUAD/')
 
-
-    download_for_url(setting.glove_char_filename,setting.glove_char_url,'./Glove')
+    download_for_url(glove_char_filename,glove_char_url,'./Glove')
     
 
-    if not os.path.exists(os.path.join('./GloVe/',setting.glove_filename)):
-        download_for_url(setting.glove_zip,setting.glove_url, './GloVe/')
+    if not os.path.exists(os.path.join('./GloVe/',glove_filename)):
+        download_for_url(glove_zip,glove_url, './GloVe/')
 
-        zip_ref = zipfile.ZipFile(os.path.join('./GloVe/',setting.glove_zip), 'r')
+        zip_ref = zipfile.ZipFile(os.path.join('./GloVe/',glove_zip), 'r')
         zip_ref.extractall('./Glove/')
         zip_ref.close()
-        os.remove(os.path.join('./GloVe/',setting.glove_zip))
+        os.remove(os.path.join('./GloVe/',glove_zip))
     else:
       print(glove_filename,"is exists!")
       print("all data download over!")

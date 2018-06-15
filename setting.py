@@ -14,32 +14,6 @@ dev_q_max=None
 #q_max = None or specific number
 #c_max = None or specific number
 
-SQUAD_dir = './SQUAD'
-GLOVE_dir = './GLOVE'
-SQUAD_v1_dir = './SQUAD/v1.1'
-Train_v1_dir = './SQUAD/v1.1/train'
-DEV_v1_dir   = './SQUAD/v1.1/dev'
-SQUAD_v2_dir = './SQUAD/v2.0'
-Train_v2_dir = './SQUAD/v2.0/train'
-DEV_v2_dir   = './SQUAD/v2.0/dev'
-Model_dir = './Model_save'
-TEMP_dir  = './TEMP_DATA'
-
-train_v1_filename = "train-v1.1.json"
-dev_v1_filename = "dev-v1.1.json"
-train_v2_filename = "train-v2.0.json"
-dev_v2_filename = "dev-v2.0.json"
-
-glove_char_filename="glove.840B.300d-char.txt"
-glove_zip = "glove.840B.300d.zip"
-glove_filename = "glove.840B.300d.txt"
-
-glove_url = "http://nlp.stanford.edu/data/"
-glove_char_url = "https://raw.githubusercontent.com/minimaxir/char-embeddings/master/"
-train_url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
-dev_url  = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
-
-
 squad_data_train_dir=r'./SQUAD/train-v1.1.json'
 squad_data_dev_dir=r'./SQUAD/dev-v1.1.json'
 glove_char_dir = r'./GloVe/glove.840B.300d-char.txt'
