@@ -31,8 +31,8 @@ python3 train.py --hidden_size 75 --dropout 0.2 --batch_size 16 --char_input 1 -
 ```
 #### Parameter Description
 	* data_version: 1 ==> SQUAD v1.1 Dataset
-					2 ==> SQUAD v2.0 Dataset (Not working this repository)
-					3 ==> DRCD Dataset 
+				2 ==> SQUAD v2.0 Dataset (Not working this repository)
+				3 ==> DRCD Dataset 
 	* hidden_size : the hidden size of RNNs.
 	* dropout : all layer dropout ratio.
 	* lr : the learning rate of R-NET.
