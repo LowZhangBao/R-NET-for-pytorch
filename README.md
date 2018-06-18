@@ -14,6 +14,7 @@ Please check your perform and software version.
 #### Python Packages
 	* torch >= 0.3.1.post2
 	* Spacy == 2.0.0 (Fix version,Don't upgrade and downgrade)
+	* jieba
 	* requests
 	* zipfile
 	* json
@@ -21,7 +22,7 @@ Please check your perform and software version.
 ## Usage
 <Step 1> SQuAD dataset preprocessing and Generate Training & Dev Data.
 ```bash
-python3 squad_data_prepro.py
+python3 data_prepro.py
 ```
 
 <Step 2> Training R-NET and Setting Parameter.
@@ -29,6 +30,9 @@ python3 squad_data_prepro.py
 python3 train.py --hidden_size 75 --dropout 0.2 --batch_size 16 --char_input 1 --emb_input 1
 ```
 #### Parameter Description
+	* data_version: 1 ==> SQUAD v1.1 Dataset
+					2 ==> SQUAD v2.0 Dataset (Not working this repository)
+					3 ==> DRCD Dataset 
 	* hidden_size : the hidden size of RNNs.
 	* dropout : all layer dropout ratio.
 	* lr : the learning rate of R-NET.
