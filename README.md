@@ -29,7 +29,7 @@ python3 data_prepro.py
 
 <Step 2> Training R-NET and Setting Parameter.
 ```bash
-python3 train.py --hidden_size 75 --dropout 0.2 --batch_size 16 --char_input 1 --emb_input 1
+python3 train.py --hidden_size 75 --dropout 0.2 --batch_size 16 --char_input 1 --emb_input 1 --encoder_concat 1
 ```
 #### Parameter Description
 	* data_version: 1 ==> SQUAD v1.1 Dataset
@@ -46,15 +46,16 @@ python3 train.py --hidden_size 75 --dropout 0.2 --batch_size 16 --char_input 1 -
 	* seed : Reproducibility paramter.
 <Step 3> Generate Prediction json file.
 ```bash
-python3 predict.py --model_dir <model_cpt_dir> --output_name prediction_answer.json
+python3 predict.py --model_dir './Model_save/v1.1/module_char_input_1_emb_input_1_concat_1_hidden_75_batch_size_16/XXX.cpt'  --batch_size 32 --data_version 1 
 ```
+
 <Step 4> Get the official Score.
 ```bash
-python3 evaluate-v1.1.py ./SQUAD/dev-v1.1.json ./prediction_answer.json
+python3 evaluate-v1.1.py ./SQUAD/v1.1/dev-v1.1.json ./Predict_save/v1.1/XXX.json
 ```
 ## Implement Detail
 	* Use PackSequence to ignore padding length.
 	* This repository is not completely reproduce the R-NET.
-	* Have Char-embedding input.
-	* Use Spacy tokenize.
+	* Use Spacy tokenize for SQUAD Dataset.
+	* Use jieba tokenize for DRCD Dataset.
 
