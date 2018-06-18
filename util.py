@@ -26,18 +26,33 @@ def load_squad_file(file_name):
                 output['qid2cid'].append(len(output['contexts']) - 1)
                 output['answers'].append(qa['answers'])
     return output
-def load_squad_data():
-    train_P_dir      = setting.train_P_dir
-    train_Q_dir      = setting.train_Q_dir
-    train_P_char_dir = setting.train_P_char_all_dir if setting.use_all_char_vocab==True else setting.train_P_char_simple_dir 
-    train_Q_char_dir = setting.train_Q_char_all_dir if setting.use_all_char_vocab==True else setting.train_Q_char_simple_dir
-    train_A_dir      = setting.train_A_dir
+def load_squad_data(version_flag=1):
+    if version_flag==2:
+      train_base = setting.Train_v2_dir
+      dev_base   = setting.DEV_v2_dir
+    elif version_flag==3:
+      train_base = setting.DRCD_train_dir
+      dev_base   = setting.DRCD_dev_dir
+      setting.use_all_char_vocab=True
+    else:
+      train_base = setting.Train_v1_dir
+      dev_base   = setting.DEV_v1_dir
 
-    dev_P_dir        = setting.dev_P_dir
-    dev_Q_dir        = setting.dev_Q_dir
-    dev_P_char_dir   = setting.dev_P_char_all_dir if setting.use_all_char_vocab==True else setting.dev_P_char_simple_dir
-    dev_Q_char_dir   = setting.dev_Q_char_all_dir if setting.use_all_char_vocab==True else setting.dev_Q_char_simple_dir
-    dev_A_dir        = setting.dev_A_dir
+
+
+    train_P_dir      = os.path.join(train_base,setting.train_P_file)
+    train_Q_dir      = os.path.join(train_base,setting.train_Q_file)
+    train_P_char_dir = os.path.join(train_base,setting.train_P_char_all_file) if setting.use_all_char_vocab==True else os.path.join(train_base,setting.train_P_char_simple_file)
+    train_Q_char_dir = os.path.join(train_base,setting.train_Q_char_all_file) if setting.use_all_char_vocab==True else os.path.join(train_base,setting.train_Q_char_simple_file)
+    train_A_dir      = os.path.join(train_base,setting.train_A_file)
+    
+
+    dev_P_dir      = os.path.join(dev_base,setting.dev_P_file)
+    dev_Q_dir      = os.path.join(dev_base,setting.dev_Q_file)
+    dev_P_char_dir = os.path.join(dev_base,setting.dev_P_char_all_file) if setting.use_all_char_vocab==True else os.path.join(dev_base,setting.dev_P_char_simple_file)
+    dev_Q_char_dir = os.path.join(dev_base,setting.dev_Q_char_all_file) if setting.use_all_char_vocab==True else os.path.join(dev_base,setting.dev_Q_char_simple_file)
+    dev_A_dir      = os.path.join(dev_base,setting.dev_A_file)
+
 
     train_P   = np.load(train_P_dir).astype(np.int32)
     train_Q   = np.load(train_Q_dir).astype(np.int32)
@@ -82,6 +97,27 @@ def load_glove_file_vocab(file_dir):
         vocab[word]=len(vocab) 
     f.close()
     return vocab
+def load_fasttext_file_embedding(file_dir,embedding,max_dim=300):
+    vocab = {}
+    index=0
+    try:
+        f = open(file_dir,"r",encoding='utf-8')
+    except:
+        f = open(file_dir,"r")
+    while True:
+        title=f.readline()
+        vec = f.readline()
+        if vec == '':
+            break
+        idx = vec.index(" ")
+        word = vec[:idx]
+        word_embedding = vec[idx+1:]
+        vocab[word]=index
+        embedding[index]=np.fromstring(word_embedding,dtype=np.float32,sep=' ')[:max_dim]
+        index+=1
+   
+    f.close()
+    return vocab,embedding
 def load_glove_to_squad_embedding(glove_vocab,squad_vocab,glove_embedding,squad_embedding):  
     for i,now_word in enumerate(squad_vocab.w_to_i):
         squad_index=squad_vocab.w_to_i[now_word]
@@ -89,7 +125,22 @@ def load_glove_to_squad_embedding(glove_vocab,squad_vocab,glove_embedding,squad_
             glove_index = glove_vocab[now_word]
             squad_embedding[squad_index,:] = glove_embedding[glove_index,:]
     return squad_embedding
-
+def load_DRCD_file(file_name):
+    try:
+        data = json.load(open(file_name, 'r',encoding='utf-8'))['data']
+    except:
+        data = json.load(open(file_name, 'r'))['data']
+    output = {'qids': [], 'questions': [], 'answers': [],
+              'contexts': [], 'qid2cid': []}
+    for article in data:
+        for paragraph in article['paragraphs']:
+            output['contexts'].append(paragraph['context'])
+            for qa in paragraph['qas']:
+                output['qids'].append(qa['id'])
+                output['questions'].append(qa['question'])
+                output['qid2cid'].append(len(output['contexts']) - 1)
+                output['answers'].append(qa['answers'])
+    return output  
 def create_char_array(char_list,char_vocab,word_max=None,char_max=None):
     _num=len(char_list)
 
@@ -149,23 +200,28 @@ def create_floder_dir(floder_dir):
     if not os.path.exists(floder_dir):
             os.mkdir(floder_dir)
 def create_floder():
+    create_floder_dir(setting.SQUAD_dir)
+    create_floder_dir(setting.FAST_dir)
+    create_floder_dir(setting.GLOVE_dir)
+    create_floder_dir(setting.SQUAD_v1_dir)
+    create_floder_dir(setting.SQUAD_v2_dir)
+    create_floder_dir(setting.Train_v1_dir)
+    create_floder_dir(setting.Train_v2_dir)
+    create_floder_dir(setting.DEV_v1_dir)
+    create_floder_dir(setting.DEV_v2_dir)
+    create_floder_dir(setting.Model_dir)
+    create_floder_dir(setting.Model_v1_dir)
+    create_floder_dir(setting.Model_v2_dir)
+    create_floder_dir(setting.Prediction_dir)
+    create_floder_dir(setting.Prediction_v1_dir)
+    create_floder_dir(setting.Prediction_v2_dir)
 
-    def check_floder(floder_dir):
-        if not os.path.exists(floder_dir):
-            os.mkdir(floder_dir)
-
-    SQUAD_dir = './SQUAD'
-    GLOVE_dir = './GLOVE'
-    Train_dir = './SQUAD/train'
-    DEV_dir   = './SQUAD/dev'
-    Model_dir = './Model_save'
-    TEMP_dir  = './TEMP_DATA'
-    check_floder(SQUAD_dir)
-    check_floder(GLOVE_dir)
-    check_floder(Train_dir)
-    check_floder(DEV_dir)
-    check_floder(Model_dir)
-    check_floder(TEMP_dir)
+    create_floder_dir(setting.DRCD_dir)
+    create_floder_dir(setting.DRCD_train_dir)
+    create_floder_dir(setting.DRCD_dev_dir)
+    create_floder_dir(setting.DRCD_model_dir)
+    create_floder_dir(setting.DRCD_Prediction_dir)
+    create_floder_dir(setting.TEMP_dir)
     print('create_floder_over')
 def download_dataset():
 
@@ -185,35 +241,47 @@ def download_dataset():
                 raise e
         else:
           print(filename,"is exists!")
+    download_for_url(setting.fast_zh_filename,setting.fast_url,setting.FAST_dir)
+    download_for_url(setting.DRCD_train_filename,setting.DRCD_url,setting.DRCD_dir)
+    download_for_url(setting.DRCD_dev_filename  ,setting.DRCD_url,setting.DRCD_dir)
 
-    train_filename = "train-v1.1.json"
-    dev_filename = "dev-v1.1.json"
-    glove_char_filename="glove.840B.300d-char.txt"
-    glove_zip = "glove.840B.300d.zip"
-    glove_filename = "glove.840B.300d.txt"
+    download_for_url(setting.train_v1_filename,setting.train_url, setting.SQUAD_v1_dir)
 
-    glove_url = "http://nlp.stanford.edu/data/"
-    glove_char_url = "https://raw.githubusercontent.com/minimaxir/char-embeddings/master/"
-    train_url = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
-    dev_url  = "https://rajpurkar.github.io/SQuAD-explorer/dataset/"
+    download_for_url(setting.dev_v1_filename  ,setting.dev_url  , setting.SQUAD_v1_dir)
 
-    download_for_url(train_filename,train_url, './SQUAD/')
+    download_for_url(setting.train_v2_filename,setting.train_url, setting.SQUAD_v2_dir)
 
-    download_for_url(dev_filename  ,dev_url  , './SQUAD/')
+    download_for_url(setting.dev_v2_filename  ,setting.dev_url  , setting.SQUAD_v2_dir)
 
-    download_for_url(glove_char_filename,glove_char_url,'./Glove')
+
+    download_for_url(setting.glove_char_filename,setting.glove_char_url,'./Glove')
     
 
-    if not os.path.exists(os.path.join('./GloVe/',glove_filename)):
-        download_for_url(glove_zip,glove_url, './GloVe/')
+    if not os.path.exists(os.path.join('./GloVe/',setting.glove_filename)):
+        download_for_url(setting.glove_zip,setting.glove_url, './GloVe/')
 
-        zip_ref = zipfile.ZipFile(os.path.join('./GloVe/',glove_zip), 'r')
+        zip_ref = zipfile.ZipFile(os.path.join('./GloVe/',setting.glove_zip), 'r')
         zip_ref.extractall('./Glove/')
         zip_ref.close()
-        os.remove(os.path.join('./GloVe/',glove_zip))
+        os.remove(os.path.join('./GloVe/',setting.glove_zip))
     else:
-      print(glove_filename,"is exists!")
+      print(setting.glove_filename,"is exists!")
       print("all data download over!")
+def get_fasttext_embedding(fasttext_dir,vocab,embedding_init,out_dim=300):
+    fast_length = get_line_count_fasttext(fasttext_dir)
+    fast_embedding = np.zeros((fast_length,out_dim), dtype=np.float32)
+
+    fast_vocab,fast_embedding = load_fasttext_file_embedding(fasttext_dir,fast_embedding,max_dim=out_dim)
+
+    if embedding_init is None:
+        embedding = np.zeros((len(vocab.w_to_i),out_dim),dtype=np.float32)
+    else:
+        embedding = np.random.normal(scale=0.01,size=(len(vocab.w_to_i),out_dim)) 
+
+    embedding = load_glove_to_squad_embedding(fast_vocab,vocab,fast_embedding,embedding)
+    
+    return embedding,fast_embedding
+
 def get_embedding(glove_dir,squad_vocab,embedding_init=None,out_dim=300):
 
     glove_length = get_line_count(glove_dir)
@@ -329,6 +397,17 @@ def get_spacy_list():
           'XX':55,
           '':56,}
     return ner_list,pos_list,pos_tag_list
+def get_line_count_fasttext(data_dir):
+    temp_line=0
+    try:
+        f = open(data_dir,"r",encoding='utf-8')
+    except:
+        f = open(data_dir,"r")
+    for _ in f:
+        temp_line += 1
+    print("Vocab size: %d" % int(temp_line/2))
+    f.close()
+    return int(temp_line/2)
 def get_line_count(data_dir):
     temp_line=0
     try:
@@ -374,7 +453,30 @@ def get_data_engine(emb_flag,P,Q,A,Pm,Qm,Pc,Qc,Pcm,Qcm,Q_ids,word_emb=None,char_
                                   num_workers=0,
                                   pin_memory=use_cuda)
     return Data_engine  
-
+def resolve_file_name(in_str):
+    aaa=in_str.strip()
+    aaa=in_str.replace('\\',' ')
+    aaa=in_str.replace('//',' ')
+    aaa=in_str.replace('/',' ')
+    aaa=aaa.split()
+    cpt=aaa[-1]
+    cpt=cpt.replace('_',' ')
+    cpt=cpt.replace('.cpt',' ')
+    cpt=cpt.split()
+    mode=cpt[0]
+    epoch=cpt[2]
+    batch=cpt[4]
+    f1=cpt[-3]
+    em=cpt[-1]
+    title=aaa[-2]
+    title=title.replace('_',' ')
+    title=title.split()
+    char_input=title[3]
+    emb_input=title[6]
+    concat=title[8]
+    hidden=title[10]
+    batch_size=title[-1]
+    return mode,epoch,batch,f1,em,char_input,emb_input,concat,hidden,batch_size 
 def create_mask(in_data,pad_id,unk_id):
     in_data_mask=np.zeros(in_data.shape,dtype=np.uint8) 
     in_data_mask[in_data==pad_id] = 1

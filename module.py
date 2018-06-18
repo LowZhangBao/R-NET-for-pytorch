@@ -70,10 +70,10 @@ class R_Net(nn.Module):
         if self.emb_input == False:
             self.char_emb = nn.Embedding(char_mat.shape[0],char_mat.shape[1])
             self.char_emb.weight.data.copy_(torch.from_numpy(char_mat))
-            self.char_emb.weight.requires_grad=False
+            self.char_emb.weight.requires_grad=True
             self.word_emb = nn.Embedding(word_mat.shape[0],word_mat.shape[1])
             self.word_emb.weight.data.copy_(torch.from_numpy(word_mat))
-            self.word_emb.weight.requires_grad=False
+            self.word_emb.weight.requires_grad=True
         # Char Encoder part
         self.P_char_gru = nn.GRU(input_size=self.character_dim,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
         self.Q_char_gru = nn.GRU(input_size=self.character_dim,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
@@ -87,8 +87,8 @@ class R_Net(nn.Module):
             self.P_reader_gru3 = nn.GRU(input_size=self.hidden_size*2,hidden_size=self.hidden_size,num_layers=1,bidirectional=True,batch_first=True)
             self.reader_output = reader_output = self.hidden_size * 2 * 3
         else:
-            self.Q_reader_gru = nn.GRU(input_size=question_dim      ,hidden_size=self.hidden_size,num_layers=num_layers,bidirectional=True,batch_first=True)
-            self.P_reader_gru = nn.GRU(input_size=context_dim       ,hidden_size=self.hidden_size,num_layers=num_layers,bidirectional=True,batch_first=True)
+            self.Q_reader_gru = nn.GRU(input_size=self.question_dim      ,hidden_size=self.hidden_size,num_layers=num_layers,bidirectional=True,batch_first=True)
+            self.P_reader_gru = nn.GRU(input_size=self.context_dim       ,hidden_size=self.hidden_size,num_layers=num_layers,bidirectional=True,batch_first=True)
             self.reader_output = reader_output = self.hidden_size *2
         # QP_Match_pack 
         self.QPP_gru_forward = nn.GRUCell(input_size = reader_output*2, hidden_size=self.hidden_size)
