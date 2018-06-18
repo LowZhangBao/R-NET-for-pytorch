@@ -20,10 +20,12 @@ Please check your perform and software version.
 	* json
 	* datetime
 ## Usage
-<Step 1> SQuAD dataset preprocessing and Generate Training & Dev Data.
+<Step 1> SQuAD and DRCD dataset preprocessing and Generate Training & Dev Data.
 ```bash
 python3 data_prepro.py
 ```
+#### Parameter Description
+	* If your want to change some Parameter , like : max passage length & max char length etc...,you can change setting.py document.
 
 <Step 2> Training R-NET and Setting Parameter.
 ```bash
