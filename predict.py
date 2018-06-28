@@ -170,9 +170,9 @@ if __name__ == '__main__':
                         if j!=0 and args.data_version!=3:
                             sentense+=" "
                         if s_index>=e_index:
-                            sentense +=  word_Vocab.get_word(dev_P[i,s_index-j])
+                            sentense +=  word_Vocab.get_word(dev_P[int(idx[i]),s_index-j])
                         else:
-                            sentense +=  word_Vocab.get_word(dev_P[i,s_index+j])
+                            sentense +=  word_Vocab.get_word(dev_P[int(idx[i]),s_index+j])
                     prediction_dict[dev_id_to_qid[dev_Q_id[i]]] = sentense
 
             print('valid_f1: %f | valid_exact: %f'%(
@@ -220,9 +220,9 @@ if __name__ == '__main__':
                     if j!=0 and args.data_version!=3:
                         sentense+=" "
                     if s_index>=e_index:
-                        sentense +=  word_Vocab.get_word(dev_P[i,s_index-j])
+                        sentense +=  word_Vocab.get_word(dev_P[int(idx[i]),s_index-j])
                     else:
-                        sentense +=  word_Vocab.get_word(dev_P[i,s_index+j])
+                        sentense +=  word_Vocab.get_word(dev_P[int(idx[i]),s_index+j])
                 prediction_dict[dev_id_to_qid[dev_Q_id[i]]] = sentense
 
         print('valid_f1: %f | valid_exact: %f'%(
